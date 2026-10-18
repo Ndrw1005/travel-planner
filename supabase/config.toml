@@ -1,0 +1,5 @@
+[functions.travel-api]
+verify_jwt = false
+# The travel-api handler verifies the user's access token with auth.getUser.
+[functions.monitor]
+verify_jwt = false
