@@ -358,7 +358,9 @@ export function exportResearch(trip: Trip) {
     version: 1,
     exportedAt: new Date().toISOString(),
     trip: { name: trip.name, start: trip.start, end: trip.end },
-    places: trip.places.filter((p) => p.kind === "hotel"),
+    places: trip.places.filter(
+      (p) => p.kind === "hotel" || p.kind === "attraction",
+    ),
     observations: trip.observations,
     receipts: trip.researchReceipts ?? [],
   };
@@ -384,14 +386,19 @@ export function validateResearchBackup(data: unknown): {
       !p ||
       typeof p.id !== "string" ||
       typeof p.name !== "string" ||
-      p.kind !== "hotel" ||
+      !["hotel", "attraction"].includes(p.kind) ||
       !Array.isArray(p.votes) ||
       typeof p.notes !== "string" ||
       typeof p.address !== "string" ||
       typeof p.source !== "string" ||
+      ((p.lat !== undefined || p.lng !== undefined) &&
+        (!Number.isFinite(p.lat) ||
+          !Number.isFinite(p.lng) ||
+          Math.abs(p.lat!) > 90 ||
+          Math.abs(p.lng!) > 180)) ||
       !Number.isFinite(p.cost)
     )
-      throw new Error("Invalid hotel record in backup.");
+      throw new Error("Invalid place record in backup.");
   for (const o of d.observations) {
     if (
       !o ||
@@ -438,22 +445,32 @@ export function mergeResearch(trip: Trip, input: unknown) {
   for (const p of data.places) {
     const match = next.places.find(
       (x) =>
-        x.kind === "hotel" &&
+        x.kind === p.kind &&
         ((x.propertyId && x.propertyId === p.propertyId) ||
           normalize(x.name) === normalize(p.name)),
     );
     if (match) {
       ids.set(p.id, match.id);
+      if (
+        match.lat === undefined &&
+        match.lng === undefined &&
+        p.lat !== undefined &&
+        p.lng !== undefined
+      ) {
+        match.lat = p.lat;
+        match.lng = p.lng;
+        match.coordinateStatus = p.coordinateStatus;
+        match.locationEvidence = p.locationEvidence;
+        match.demo = p.demo;
+      }
     } else {
       const id = uid();
       ids.set(p.id, id);
       next.places.push({
         ...p,
         id,
-        lat: undefined,
-        lng: undefined,
         placeId: undefined,
-        source: p.source + " · transferred; confirm map coordinates",
+        source: p.source + " · transferred",
       });
     }
   }

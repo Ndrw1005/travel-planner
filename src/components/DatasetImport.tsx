@@ -1,7 +1,14 @@
+import {
+  isCoordinateCSV,
+  reconcileCoordinates,
+  applyCoordinates,
+  type CoordinateDecision,
+} from "../lib/import/coordinates";
 import { useEffect, useState } from "react";
 import { type Trip, exportFile, money } from "../lib/model";
 import {
   type Dataset,
+  csvRows,
   readDatasetFile,
   matchPlace,
   mergeDataset,
@@ -17,6 +24,7 @@ export default function DatasetImport({
   update: (t: Trip) => void;
   file?: File;
 }) {
+  const [coordinates, setCoordinates] = useState<CoordinateDecision[]>();
   const [data, setData] = useState<Dataset>(),
     [selected, setSelected] = useState<Set<string>>(new Set()),
     [overrides, setOverrides] = useState<Record<string, string[]>>({}),
@@ -26,7 +34,32 @@ export default function DatasetImport({
   async function read(file: File) {
     setBusy(true);
     setMessage("");
+    setCoordinates(undefined);
+    setData(undefined);
     try {
+      if (/\.csv$/i.test(file.name)) {
+        if (file.size > 5 * 1024 * 1024)
+          throw new Error("Coordinate/research CSV must be under 5 MB.");
+        const rows = csvRows(await file.text());
+        if (isCoordinateCSV(rows)) {
+          const decisions = reconcileCoordinates(trip, rows);
+          const next = applyCoordinates(trip, decisions);
+          if (JSON.stringify(next).length > 2000000)
+            throw new Error(
+              "Trip exceeds device storage budget. Export a backup first.",
+            );
+          exportFile(
+            `wayfarer-before-coordinates-${Date.now()}.json`,
+            JSON.stringify({ version: 1, trips: [trip] }, null, 2),
+          );
+          update(next);
+          setCoordinates(decisions);
+          setMessage(
+            `Coordinate import complete: ${new Set(decisions.filter((d) => d.status === "ready").map((d) => d.placeId)).size} places updated; ${decisions.filter((d) => d.status !== "ready").length} rows need review or have no match. Existing places were updated without creating duplicates. A backup was downloaded.`,
+          );
+          return;
+        }
+      }
       const d = await readDatasetFile(file);
       setData(d);
       setOverrides({});
@@ -80,9 +113,16 @@ export default function DatasetImport({
     <section className="panel dataset-import">
       <h2>Import researched dataset</h2>
       <p>
-        Upload your ChatGPT research as CSV, v2 JSON, or a ZIP with the master
-        JSON and private photos. Exact fields are read directly. This workflow
-        merges research and preserves saved history and edits.
+        Upload geocoded coordinates (CSV), ChatGPT research as CSV, v2 JSON, or
+        a ZIP with the master JSON and private photos. Exact fields are read
+        directly. This workflow merges research and preserves saved history and
+        edits.
+      </p>
+      <p>
+        Coordinate CSVs accept record_id, latitude, longitude or Geoapify batch
+        results with original_record_id / query.text. Reliable coordinates are
+        applied immediately to existing places; uncertain results preserve
+        existing pins. No API key or manual marker positioning required.
       </p>
       <label>
         Research dataset files
@@ -106,6 +146,30 @@ export default function DatasetImport({
         <p role="status" className="notice">
           {message}
         </p>
+      )}
+      {coordinates && (
+        <details className="coordinate-report" open>
+          <summary>
+            Coordinate import results · {coordinates.length} rows
+          </summary>
+          <div className="dataset-rows">
+            {coordinates.map((row, i) => (
+              <div className="dataset-row" key={i}>
+                <strong>{row.name || row.record}</strong> · {row.record} ·{" "}
+                {row.status === "ready" ? "Saved on map" : "Needs review"}
+                <p>{row.reason}</p>
+                {row.evidence && (
+                  <p>
+                    {row.evidence.precision} · {row.evidence.latitude},{" "}
+                    {row.evidence.longitude} · {row.evidence.provider}
+                    <br />
+                    {row.evidence.attribution} {row.evidence.license}
+                  </p>
+                )}
+              </div>
+            ))}
+          </div>
+        </details>
       )}
       {data && (
         <>

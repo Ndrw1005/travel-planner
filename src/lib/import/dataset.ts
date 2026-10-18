@@ -1,3 +1,4 @@
+import { assessCoordinates } from "./coordinates";
 import { type Place, type Observation, type Trip, uid } from "../model";
 import { emptyDetails } from "./types";
 import { normalize } from "./parser";
@@ -208,11 +209,29 @@ export function parseDataset(
           ratingProvider: r.platform,
           rating: r.rating_score ? Number(r.rating_score) : undefined,
         };
-        issues.push(
-          blocked
-            ? "Location unknown — unique listing required; geocoding disabled."
-            : "Confirm map location before placing a pin.",
-        );
+        if (r.latitude || r.longitude || r.lat || r.lon) {
+          const result = assessCoordinates(r, p);
+          if (result.status === "ready" && result.evidence) {
+            p.lat = result.evidence.latitude;
+            p.lng = result.evidence.longitude;
+            p.locationEvidence = result.evidence;
+            p.coordinateStatus =
+              result.evidence.precision === "supplied"
+                ? "IMPORTED_COORDINATES"
+                : "GEOCODED_EXACT";
+          } else {
+            p.locationReview = [
+              { reason: result.reason, evidence: result.evidence },
+            ];
+            issues.push(result.reason);
+          }
+        }
+        if (p.lat === undefined)
+          issues.push(
+            blocked
+              ? "Location unknown — unique listing required; geocoding disabled."
+              : "Confirm map location before placing a pin.",
+          );
         if (r.photo_asset_path) {
           if (!safePhotoPath(r.photo_asset_path))
             throw new Error("Unsafe photo path");
@@ -368,8 +387,29 @@ export function mergeDataset(
           propertyId: existing.propertyId || row.place.propertyId,
           photoKey: existing.photoKey || row.place.photoKey,
         };
+        if (
+          existing.lat === undefined &&
+          existing.lng === undefined &&
+          row.place.lat !== undefined
+        ) {
+          const checked = assessCoordinates(row.raw, existing, next);
+          if (checked.status === "ready" && checked.evidence) {
+            patch.lat = checked.evidence.latitude;
+            patch.lng = checked.evidence.longitude;
+            patch.locationEvidence = checked.evidence;
+            patch.coordinateStatus = row.place.coordinateStatus;
+          } else
+            patch.locationReview = [
+              { reason: checked.reason, evidence: checked.evidence },
+            ];
+        }
         for (const field of mergeFields)
           if (
+            field === "coordinateStatus" &&
+            (existing.lat !== undefined || patch.lat !== undefined)
+          )
+            continue;
+          else if (
             existing[field] === undefined ||
             existing[field] === "" ||
             overwrite[row.key]?.includes(field)
@@ -379,7 +419,20 @@ export function mergeDataset(
           p.id === itemId ? { ...p, ...patch } : p,
         );
       } else {
-        next.places.push(structuredClone(row.place));
+        const addedPlace = structuredClone(row.place);
+        if (addedPlace.lat !== undefined) {
+          const checked = assessCoordinates(row.raw, addedPlace, next);
+          if (checked.status !== "ready") {
+            delete addedPlace.lat;
+            delete addedPlace.lng;
+            delete addedPlace.locationEvidence;
+            addedPlace.coordinateStatus = "NEEDS_REVIEW";
+            addedPlace.locationReview = [
+              { reason: checked.reason, evidence: checked.evidence },
+            ];
+          }
+        }
+        next.places.push(addedPlace);
         itemId = row.place.id;
         added++;
       }

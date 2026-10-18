@@ -1238,6 +1238,20 @@ function PlaceDetails({
         <dt>Source</dt>
         <dd>{place.source}</dd>
       </dl>
+      {place.locationEvidence && (
+        <p className="notice">
+          Location: {place.locationEvidence.precision} ·{" "}
+          {place.locationEvidence.provider}
+          <br />
+          {place.locationEvidence.attribution} {place.locationEvidence.license}
+        </p>
+      )}
+      {place.locationReview?.map((review, i) => (
+        <p className="notice" key={i}>
+          Location needs review: {review.reason}
+          {review.evidence && ` (${review.evidence.precision})`}
+        </p>
+      ))}
       {place.lat === undefined && !place.placeId && (
         <p className="notice">
           Location unverified. Add coordinates to zoom to this place.

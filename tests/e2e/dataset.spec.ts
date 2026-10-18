@@ -329,3 +329,135 @@ test("saved addresses can be located together directly on the map and persist af
   ).toHaveCount(1);
   expect(queries).toHaveLength(lookupCount);
 });
+
+test("coordinate CSV automatically updates existing records, map pins, backups and reloads", async ({
+  page,
+}) => {
+  const requests: string[] = [];
+  page.on("request", (request) => {
+    if (/geoapify|photon|nominatim/.test(request.url()))
+      requests.push(request.url());
+  });
+  await page.goto("./");
+  await page.getByRole("button", { name: "Open trip", exact: true }).click();
+  await nav(page, "Import research");
+  await upload(page);
+  await page
+    .getByRole("button", { name: "Import selected dataset records" })
+    .click();
+  await expect(
+    page.getByRole("status").filter({ hasText: "Dataset saved" }),
+  ).toBeVisible();
+  const before = await page.evaluate(
+    () => JSON.parse(localStorage.getItem("wayfarer-v1")!)[0],
+  );
+  const backupDownload = page.waitForEvent("download");
+  await page.getByLabel("Research dataset files").setInputFiles({
+    name: "coordinates.csv",
+    mimeType: "text/csv",
+    buffer: Buffer.from(
+      "record_id,latitude,longitude\nTEST-1,34.69,135.51\nAPA-999,34.68,135.5",
+    ),
+  });
+  await expect(
+    page
+      .getByRole("status")
+      .filter({ hasText: "Coordinate import complete: 2 places updated" }),
+  ).toBeVisible();
+  const backup = await backupDownload;
+  expect(
+    JSON.parse(await readFile((await backup.path())!, "utf8")).trips[0],
+  ).toEqual(before);
+  const after = await page.evaluate(
+    () => JSON.parse(localStorage.getItem("wayfarer-v1")!)[0],
+  );
+  expect(after.places.length).toBe(before.places.length);
+  expect(after.observations).toEqual(before.observations);
+  expect(
+    after.places.find(
+      (p: { name: string }) => p.name === "Synthetic Research Hotel",
+    ),
+  ).toMatchObject({ lat: 34.68, lng: 135.5 });
+  await upload(page);
+  await page
+    .getByRole("button", { name: "Import selected dataset records" })
+    .click();
+  await expect(
+    page.getByRole("status").filter({ hasText: "Dataset saved" }),
+  ).toBeVisible();
+  await nav(page, "Interactive map");
+  await expect(
+    page.locator('.leaflet-marker-icon[title="Synthetic Research Hotel"]'),
+  ).toHaveCount(1);
+  await expect(
+    page.locator('.leaflet-marker-icon[title="Synthetic Museum"]'),
+  ).toHaveCount(1);
+  await page.reload();
+  await nav(page, "Interactive map");
+  await expect(
+    page.locator('.leaflet-marker-icon[title="Synthetic Research Hotel"]'),
+  ).toHaveCount(1);
+  await nav(page, "Import research");
+  await page.getByLabel("Research dataset files").setInputFiles({
+    name: "geoapify.csv",
+    mimeType: "text/csv",
+    buffer: Buffer.from(
+      "original_record_id,lat,lon,name,city,result_type,confidence\nAPA-999,34.7,135.6,Wrong business,Osaka,district,1",
+    ),
+  });
+  await expect(
+    page
+      .getByRole("status")
+      .filter({ hasText: "Coordinate import complete: 0 places updated" }),
+  ).toBeVisible();
+  const preserved = await page.evaluate(
+    () => JSON.parse(localStorage.getItem("wayfarer-v1")!)[0],
+  );
+  expect(
+    preserved.places.find(
+      (p: { name: string }) => p.name === "Synthetic Research Hotel",
+    ),
+  ).toMatchObject({ lat: 34.68, lng: 135.5 });
+  expect(requests).toEqual([]);
+});
+
+test("Geoapify CSV applies a reliable query match automatically and flags district results", async ({
+  page,
+}) => {
+  await page.goto("./");
+  await page.getByRole("button", { name: "Open trip", exact: true }).click();
+  await nav(page, "Import research");
+  await upload(page);
+  await page
+    .getByRole("button", { name: "Import selected dataset records" })
+    .click();
+  await expect(
+    page.getByRole("status").filter({ hasText: "Dataset saved" }),
+  ).toBeVisible();
+  await page.getByLabel("Research dataset files").setInputFiles({
+    name: "geoapify.csv",
+    mimeType: "text/csv",
+    buffer: Buffer.from(
+      'query.text,lat,lon,name,city,result_type,rank.confidence\n"Synthetic Research Hotel, Synthetic test address",34.68,135.5,Synthetic Research Hotel,Osaka,amenity,0.99',
+    ),
+  });
+  await expect(
+    page
+      .getByRole("status")
+      .filter({ hasText: "Coordinate import complete: 1 places updated" }),
+  ).toBeVisible();
+  await nav(page, "Interactive map");
+  const marker = page.locator(
+    '.leaflet-marker-icon[title="Synthetic Research Hotel"]',
+  );
+  await expect(marker).toHaveCount(1);
+  await page
+    .locator(".place-card")
+    .filter({ hasText: "Synthetic Research Hotel" })
+    .getByRole("button", { name: "Details", exact: true })
+    .click();
+  await expect(page.locator(".place-details-panel")).toContainText(
+    "property · Geoapify",
+  );
+  await expect(page.locator(".map-canvas")).toHaveAttribute("data-zoom", "16");
+});
