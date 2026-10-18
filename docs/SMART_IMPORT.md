@@ -60,6 +60,14 @@ No return flight, baggage allowance, exact hotel identity, four-night total, ava
 
 Provider references: [PDF.js examples](https://mozilla.github.io/pdf.js/examples/) and [Tesseract.js API](https://github.com/naptha/tesseract.js/blob/master/docs/api.md).
 
-### Approve a whole batch
+### Approve and save a whole batch
 
-Choose **Approve all entries** to confirm the displayed context, mark every entry reviewed, and select it in one click. Duplicate entries and entries set to Skip are excluded. Missing required fields still need correction. Choose **Confirm import** to save the approved batch.
+After skimming the parsed entries, use **Approve & import all entries** at the bottom of the list. This confirms the displayed context, selects the batch, and saves it directly to Flights or Hotels in one click. Duplicate entries and entries set to Skip are excluded. Required-field errors still need correction; the batch is not partially saved if validation fails. The footer stays below the list instead of floating over it.
+
+For individual selections, use the existing checkboxes and **Confirm import**.
+
+### Map place details
+
+Click a marker, a saved-place card, or its **Details** button to zoom to the place and show the details panel on the right (below the map on smaller screens). Places without confirmed coordinates cannot be zoomed to. The panel shows saved prices and conditions, room information, amenities, opening hours, notes, and source information. Use **Edit place details / photo** to add a photo URL or update saved details.
+
+If Google Places is already configured and the place has a Google Place ID, the panel can retrieve photos, hours, address, and rating for this session. Photos include author attribution. This follows the [Google Place Photos documentation](https://developers.google.com/maps/documentation/javascript/place-photos). Without that connection, missing photos and hours are labeled as unavailable; they are not invented. Google details remain in memory and do not replace saved information.

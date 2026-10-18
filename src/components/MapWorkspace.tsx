@@ -100,7 +100,15 @@ export default function MapWorkspace({
     [access, setAccess] = useState<{ id: string; minutes: number }[]>([]),
     [accessMessage, setAccessMessage] = useState("");
   const mapPlaces = trip.places.map((p) => ({ ...p, ...resolved[p.id] }));
-  const active = hover ?? selected;
+  const active = selected ?? hover;
+  const [focusVersion, setFocusVersion] = useState(0);
+  function selectPlace(id: string) {
+    setDay("");
+    setHover(undefined);
+    setSelected(id);
+    setPanelOpen(true);
+    setFocusVersion((v) => v + 1);
+  }
   useEffect(() => {
     if (active) setPanelOpen(true);
   }, [active]);
@@ -110,8 +118,8 @@ export default function MapWorkspace({
   );
   const onHover = useRef(setHover);
   onHover.current = setHover;
-  const onSelect = useRef(setSelected);
-  onSelect.current = setSelected;
+  const onSelect = useRef(selectPlace);
+  onSelect.current = selectPlace;
   useEffect(() => {
     let disposed = false;
     if (googleKey) {
@@ -126,6 +134,10 @@ export default function MapWorkspace({
             zoom: 11,
             mapTypeControl: false,
             streetViewControl: false,
+          });
+          map.current.addListener("zoom_changed", () => {
+            if (root.current && map.current && !(map.current instanceof L.Map))
+              root.current.dataset.zoom = String(map.current.getZoom());
           });
           setLoaded(true);
         })
@@ -145,6 +157,12 @@ export default function MapWorkspace({
         maxZoom: 19,
       }).addTo(m);
       map.current = m;
+      m.on("zoomend moveend", () => {
+        if (root.current) {
+          root.current.dataset.zoom = String(m.getZoom());
+          root.current.dataset.center = `${m.getCenter().lat},${m.getCenter().lng}`;
+        }
+      });
       setLoaded(true);
     }
     return () => {
@@ -395,7 +413,8 @@ export default function MapWorkspace({
         );
       }
     }
-    if (shown.length && !bounds.isEmpty()) map.current.fitBounds(bounds, 65);
+    if (day && shown.length && !bounds.isEmpty())
+      map.current.fitBounds(bounds, 65);
   }, [routes, alternative, day, dailyRoutes, loaded, demoRoutes]);
   async function search() {
     setError("");
@@ -432,7 +451,7 @@ export default function MapWorkspace({
     if (map.current instanceof L.Map)
       map.current.fitBounds(
         points.map((p) => [p.lat!, p.lng!] as L.LatLngTuple),
-        { padding: [70, 70], maxZoom: 13 },
+        { padding: [70, 70], maxZoom: 13, animate: false },
       );
     else {
       const bounds = new google.maps.LatLngBounds();
@@ -440,6 +459,30 @@ export default function MapWorkspace({
       map.current.fitBounds(bounds, 70);
     }
   }, [loaded, resolved]);
+  useEffect(() => {
+    if (!loaded || !root.current) return;
+    const observer = new ResizeObserver(() => {
+      if (map.current instanceof L.Map) map.current.invalidateSize();
+    });
+    observer.observe(root.current);
+    return () => observer.disconnect();
+  }, [loaded]);
+  useEffect(() => {
+    if (!loaded || !selected || !map.current) return;
+    const place = mapPlaces.find((p) => p.id === selected);
+    if (place?.lat === undefined || place.lng === undefined) return;
+    if (map.current instanceof L.Map) {
+      map.current.stop();
+      map.current.invalidateSize();
+      map.current.setView([place.lat, place.lng], 16, { animate: false });
+    } else {
+      map.current.panTo({ lat: place.lat, lng: place.lng });
+      map.current.setZoom(16);
+    }
+    if (root.current) {
+      root.current.dataset.focusedPlace = selected;
+    }
+  }, [selected, focusVersion, loaded, resolved]);
   const dayGeneration = useRef(0);
   useEffect(() => {
     if (!day) dayGeneration.current++;
@@ -550,7 +593,7 @@ export default function MapWorkspace({
       p.name.toLowerCase().includes(query.toLowerCase()),
   );
   return (
-    <div className="map-workspace">
+    <div className={`map-workspace ${panelOpen ? "with-details" : ""}`}>
       <div className="map-list">
         <div className="section-heading">
           <div>
@@ -671,10 +714,16 @@ export default function MapWorkspace({
               onBlur={() => setHover(undefined)}
               onClick={() => {
                 setDay("");
-                setSelected(p.id);
+                selectPlace(p.id);
               }}
               onKeyDown={(e) => {
-                if (e.key === "Enter") setSelected(p.id);
+                if (
+                  e.target === e.currentTarget &&
+                  (e.key === "Enter" || e.key === " ")
+                ) {
+                  e.preventDefault();
+                  selectPlace(p.id);
+                }
               }}
             >
               <div className="place-top">
@@ -705,7 +754,7 @@ export default function MapWorkspace({
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
-                    editPlace(p);
+                    selectPlace(p.id);
                   }}
                 >
                   Details
@@ -716,7 +765,7 @@ export default function MapWorkspace({
                     onClick={(e) => {
                       e.stopPropagation();
                       update({ ...trip, baseId: p.id });
-                      setSelected(p.id);
+                      selectPlace(p.id);
                     }}
                   >
                     {trip.baseId === p.id ? "✓ Your base" : "Use as base"}
@@ -736,7 +785,7 @@ export default function MapWorkspace({
               "Calculate travel times to your saved attractions."}
           </p>
           {access.map((a) => (
-            <button key={a.id} onClick={() => setSelected(a.id)}>
+            <button key={a.id} onClick={() => selectPlace(a.id)}>
               {trip.places.find((p) => p.id === a.id)?.name} · {a.minutes} min
             </button>
           ))}
@@ -761,7 +810,7 @@ export default function MapWorkspace({
               if (map.current instanceof L.Map && pts.length)
                 map.current.fitBounds(
                   pts.map((p) => [p.lat!, p.lng!] as L.LatLngTuple),
-                  { padding: [45, 45] },
+                  { padding: [45, 45], animate: false },
                 );
               else if (map.current && pts.length) {
                 const b = new google.maps.LatLngBounds();
@@ -778,172 +827,357 @@ export default function MapWorkspace({
             Route explorer
           </button>
         )}
-        {panelOpen && (
-          <div className="route-panel">
-            <div className="row">
-              <span className="eyebrow">
-                <Navigation size={14} /> ROUTE EXPLORER
-              </span>
-              <button
-                aria-label="Dismiss route"
-                className="icon-button"
-                onClick={() => {
-                  setPanelOpen(false);
-                  setSelected(undefined);
-                  setHover(undefined);
-                  setDay("");
-                  setRoutes([]);
-                  setRouteState("Select a hotel to explore airport access.");
-                }}
-              >
-                <X size={16} />
-              </button>
-            </div>
-            <h3>
-              {day
-                ? "Your day, connected"
-                : target
-                  ? `${origin?.name ?? "Choose a base"} → ${target.name}`
-                  : "A better sense of place"}
-            </h3>
-            <div className="row wrap">
-              <select
-                aria-label="Transport mode"
-                value={mode}
+      </div>
+      {panelOpen && (
+        <aside
+          className="route-panel place-details-panel"
+          aria-label="Selected place details"
+        >
+          <div className="row">
+            <span className="eyebrow">
+              <Navigation size={14} />{" "}
+              {target ? "PLACE DETAILS" : "ROUTE EXPLORER"}
+            </span>
+            <button
+              aria-label="Dismiss route"
+              className="icon-button"
+              onClick={() => {
+                setPanelOpen(false);
+                setSelected(undefined);
+                setHover(undefined);
+                setDay("");
+                setRoutes([]);
+                setRouteState("Select a hotel to explore airport access.");
+              }}
+            >
+              <X size={16} />
+            </button>
+          </div>
+          {target && (
+            <PlaceDetails
+              key={target.id}
+              place={target}
+              trip={trip}
+              edit={() => editPlace(target)}
+            />
+          )}
+          <h3>
+            {day
+              ? "Your day, connected"
+              : target
+                ? `${origin?.name ?? "Choose a base"} → ${target.name}`
+                : "A better sense of place"}
+          </h3>
+          <div className="row wrap">
+            <select
+              aria-label="Transport mode"
+              value={mode}
+              onChange={(e) => {
+                setMode(e.target.value);
+                setDay("");
+              }}
+            >
+              <option value="TRANSIT">Public transit</option>
+              <option value="WALK">Walking</option>
+              <option value="DRIVE">Driving</option>
+            </select>
+            <select
+              aria-label="Route day"
+              value={day}
+              onChange={(e) => void routeDay(e.target.value)}
+            >
+              <option value="">Single route</option>
+              {dates(trip.start, trip.end).map((d) => (
+                <option key={d}>{d}</option>
+              ))}
+            </select>
+          </div>
+          <details>
+            <summary>Departure & preferences</summary>
+            <label>
+              Local departure
+              <input
+                type="datetime-local"
+                value={departure}
                 onChange={(e) => {
-                  setMode(e.target.value);
+                  setDeparture(e.target.value);
                   setDay("");
                 }}
-              >
-                <option value="TRANSIT">Public transit</option>
-                <option value="WALK">Walking</option>
-                <option value="DRIVE">Driving</option>
-              </select>
+              />
+            </label>
+            <p>Destination timezone: {trip.timezone}</p>
+            <label>
+              Transit preference
               <select
-                aria-label="Route day"
-                value={day}
-                onChange={(e) => void routeDay(e.target.value)}
+                value={preference}
+                onChange={(e) => setPreference(e.target.value)}
               >
-                <option value="">Single route</option>
-                {dates(trip.start, trip.end).map((d) => (
-                  <option key={d}>{d}</option>
-                ))}
+                <option value="">Default</option>
+                <option value="LESS_WALKING">Less walking</option>
+                <option value="FEWER_TRANSFERS">Fewer transfers</option>
               </select>
-            </div>
-            <details>
-              <summary>Departure & preferences</summary>
-              <label>
-                Local departure
-                <input
-                  type="datetime-local"
-                  value={departure}
-                  onChange={(e) => {
-                    setDeparture(e.target.value);
-                    setDay("");
-                  }}
-                />
-              </label>
-              <p>Destination timezone: {trip.timezone}</p>
-              <label>
-                Transit preference
-                <select
-                  value={preference}
-                  onChange={(e) => setPreference(e.target.value)}
-                >
-                  <option value="">Default</option>
-                  <option value="LESS_WALKING">Less walking</option>
-                  <option value="FEWER_TRANSFERS">Fewer transfers</option>
-                </select>
-              </label>
-            </details>
-            <p className="muted">{routeState}</p>
-            {!googleKey && (
-              <label className="check">
-                <input
-                  type="checkbox"
-                  checked={demoRoutes}
-                  onChange={(e) => setDemoRoutes(e.target.checked)}
-                />
-                Show illustrative KIX–Namba path
-              </label>
-            )}
-            {demoRoutes && !googleKey && (
-              <p className="notice">
-                Illustration only. Not a transport route; no times or fares.
+            </label>
+          </details>
+          <p className="muted">{routeState}</p>
+          {!googleKey && (
+            <label className="check">
+              <input
+                type="checkbox"
+                checked={demoRoutes}
+                onChange={(e) => setDemoRoutes(e.target.checked)}
+              />
+              Show illustrative KIX–Namba path
+            </label>
+          )}
+          {demoRoutes && !googleKey && (
+            <p className="notice">
+              Illustration only. Not a transport route; no times or fares.
+            </p>
+          )}
+          {routes.length > 1 && (
+            <select
+              aria-label="Alternative route"
+              value={alternative}
+              onChange={(e) => setAlternative(Number(e.target.value))}
+            >
+              {routes.map((r, i) => (
+                <option value={i} key={i}>
+                  Option {i + 1} · {Math.round(parseInt(r.duration) / 60)} min
+                </option>
+              ))}
+            </select>
+          )}
+          {route && (
+            <>
+              <div className="route-metrics">
+                <strong>
+                  {Math.round(parseInt(route.duration) / 60)}
+                  <small> minutes</small>
+                </strong>
+                <span>{(route.distanceMeters / 1000).toFixed(1)} km</span>
+              </div>
+              <p>
+                Estimated arrival{" "}
+                {new Date(
+                  new Date(localToUtc(departure, trip.timezone)).getTime() +
+                    parseInt(route.duration) * 1000,
+                ).toLocaleString("en-US", { timeZone: trip.timezone })}
               </p>
-            )}
-            {routes.length > 1 && (
-              <select
-                aria-label="Alternative route"
-                value={alternative}
-                onChange={(e) => setAlternative(Number(e.target.value))}
-              >
-                {routes.map((r, i) => (
-                  <option value={i} key={i}>
-                    Option {i + 1} · {Math.round(parseInt(r.duration) / 60)} min
-                  </option>
-                ))}
-              </select>
-            )}
-            {route && (
-              <>
-                <div className="route-metrics">
-                  <strong>
-                    {Math.round(parseInt(route.duration) / 60)}
-                    <small> minutes</small>
-                  </strong>
-                  <span>{(route.distanceMeters / 1000).toFixed(1)} km</span>
-                </div>
-                <p>
-                  Estimated arrival{" "}
-                  {new Date(
-                    new Date(localToUtc(departure, trip.timezone)).getTime() +
-                      parseInt(route.duration) * 1000,
-                  ).toLocaleString("en-US", { timeZone: trip.timezone })}
-                </p>
-                <p>
-                  {Math.max(
-                    0,
-                    route.legs
-                      .flatMap((l) => l.steps)
-                      .filter((s) => s.transitDetails).length - 1,
-                  )}{" "}
-                  transfers ·{" "}
-                  {Math.round(
-                    route.legs
-                      .flatMap((l) => l.steps)
-                      .filter((s) => s.travelMode === "WALK")
-                      .reduce(
-                        (n, s) => n + parseInt(s.staticDuration || "0"),
-                        0,
-                      ) / 60,
-                  )}{" "}
-                  min walking
-                </p>
-                {route.travelAdvisory?.transitFare && (
-                  <p>
-                    Fare: {route.travelAdvisory.transitFare.currencyCode}{" "}
-                    {route.travelAdvisory.transitFare.units}
-                  </p>
-                )}
-                <ol className="route-steps">
-                  {route.legs
+              <p>
+                {Math.max(
+                  0,
+                  route.legs
                     .flatMap((l) => l.steps)
-                    .map((s, i) => (
-                      <li key={i}>
-                        {s.transitDetails?.transitLine?.name ||
-                          s.navigationInstruction?.instructions ||
-                          s.travelMode}
-                        {s.transitDetails?.headsign &&
-                          ` toward ${s.transitDetails.headsign}`}
-                      </li>
-                    ))}
-                </ol>
+                    .filter((s) => s.transitDetails).length - 1,
+                )}{" "}
+                transfers ·{" "}
+                {Math.round(
+                  route.legs
+                    .flatMap((l) => l.steps)
+                    .filter((s) => s.travelMode === "WALK")
+                    .reduce(
+                      (n, s) => n + parseInt(s.staticDuration || "0"),
+                      0,
+                    ) / 60,
+                )}{" "}
+                min walking
+              </p>
+              {route.travelAdvisory?.transitFare && (
+                <p>
+                  Fare: {route.travelAdvisory.transitFare.currencyCode}{" "}
+                  {route.travelAdvisory.transitFare.units}
+                </p>
+              )}
+              <ol className="route-steps">
+                {route.legs
+                  .flatMap((l) => l.steps)
+                  .map((s, i) => (
+                    <li key={i}>
+                      {s.transitDetails?.transitLine?.name ||
+                        s.navigationInstruction?.instructions ||
+                        s.travelMode}
+                      {s.transitDetails?.headsign &&
+                        ` toward ${s.transitDetails.headsign}`}
+                    </li>
+                  ))}
+              </ol>
+            </>
+          )}
+        </aside>
+      )}
+    </div>
+  );
+}
+
+function PlaceDetails({
+  place,
+  trip,
+  edit,
+}: {
+  place: Place;
+  trip: Trip;
+  edit: () => void;
+}) {
+  const latest = trip.observations
+    .filter((o) => o.kind === "hotel" && o.itemId === place.id)
+    .sort((a, b) => b.at.localeCompare(a.at))[0];
+  const [live, setLive] = useState<google.maps.places.Place>();
+  const [liveError, setLiveError] = useState("");
+  useEffect(() => {
+    if (!googleKey || !place.placeId) return;
+    let cancelled = false;
+    loadGoogle()
+      .then(async () => {
+        const { Place } = (await google.maps.importLibrary(
+          "places",
+        )) as google.maps.PlacesLibrary;
+        const details = new Place({ id: place.placeId! });
+        await details.fetchFields({
+          fields: [
+            "photos",
+            "regularOpeningHours",
+            "formattedAddress",
+            "rating",
+          ],
+        });
+        if (!cancelled) setLive(details);
+      })
+      .catch(() => {
+        if (!cancelled)
+          setLiveError(
+            "Live place details unavailable. Saved information is shown.",
+          );
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [place.placeId]);
+  const [failedPhoto, setFailedPhoto] = useState("");
+  const photo =
+    place.photoUrl && /^https?:\/\//i.test(place.photoUrl)
+      ? place.photoUrl
+      : live?.photos?.[0]?.getURI({ maxWidth: 640 });
+  return (
+    <section className="place-detail-content">
+      <span className="badge">{place.kind}</span>
+      <h2>{place.name}</h2>
+      {photo && failedPhoto !== photo ? (
+        <img
+          className="place-detail-photo"
+          src={photo}
+          alt={place.name}
+          referrerPolicy="no-referrer"
+          onError={() => setFailedPhoto(photo)}
+        />
+      ) : (
+        <div className="place-photo-empty">
+          <MapPin size={28} />
+          <span>No photo saved</span>
+        </div>
+      )}
+      {!place.photoUrl && live?.photos?.[0] && (
+        <p>
+          Google Maps · Photo by{" "}
+          {live.photos[0].authorAttributions.map((author, i) => (
+            <a
+              key={i}
+              href={
+                author.uri && /^https?:\/\//i.test(author.uri)
+                  ? author.uri
+                  : undefined
+              }
+              target="_blank"
+              rel="noreferrer"
+            >
+              {author.displayName}{" "}
+            </a>
+          ))}
+        </p>
+      )}
+      {live && <p>Additional place details from Google Maps</p>}
+      {liveError && <p>{liveError}</p>}
+      <p>{place.address || live?.formattedAddress || "Address not saved"}</p>
+      {place.demo && <span className="badge amber">Demonstration data</span>}
+      <dl>
+        {place.kind === "hotel" ? (
+          <>
+            <dt>Latest saved price</dt>
+            <dd>
+              {latest
+                ? `${latest.currency} ${latest.amount.toLocaleString()} · ${latest.at}`
+                : "No price observations saved"}
+            </dd>
+            {latest && (
+              <>
+                <dt>Price conditions</dt>
+                <dd>
+                  {latest.research
+                    ? [
+                        latest.research.details.room,
+                        latest.research.details.start,
+                        latest.research.details.end,
+                        latest.research.details.priceScope,
+                      ]
+                        .filter(Boolean)
+                        .join(" · ") || "Unconfirmed"
+                    : latest.basis}
+                </dd>
+                <dd>
+                  {latest.source} · Historical observation, not live
+                  availability
+                </dd>
               </>
             )}
-          </div>
+            <dt>Stay estimate</dt>
+            <dd>
+              {place.cost ? `JPY ${place.cost.toLocaleString()}` : "Not set"}
+            </dd>
+            <dt>Room</dt>
+            <dd>
+              {place.room || latest?.research?.details.room || "Not saved"}
+            </dd>
+            <dt>Amenities</dt>
+            <dd>{place.amenities || "Not saved"}</dd>
+            <dt>Cancellation</dt>
+            <dd>{place.cancellation || "Not saved"}</dd>
+          </>
+        ) : (
+          <>
+            <dt>Opening hours / booking status</dt>
+            <dd>
+              {place.opening ||
+                live?.regularOpeningHours?.weekdayDescriptions.join("\n") ||
+                "Opening hours not saved"}
+            </dd>
+            <dt>Planned visit</dt>
+            <dd>{place.minutes} minutes</dd>
+            <dt>Estimated cost</dt>
+            <dd>
+              {place.cost ? `JPY ${place.cost.toLocaleString()}` : "Not set"}
+            </dd>
+          </>
         )}
-      </div>
-    </div>
+        {(place.rating !== undefined || live?.rating != null) && (
+          <>
+            <dt>Saved rating</dt>
+            <dd>{place.rating ?? live?.rating} / 5</dd>
+          </>
+        )}
+        {place.notes && (
+          <>
+            <dt>Notes</dt>
+            <dd>{place.notes}</dd>
+          </>
+        )}
+        <dt>Source</dt>
+        <dd>{place.source}</dd>
+      </dl>
+      {place.lat === undefined && !place.placeId && (
+        <p className="notice">
+          Location unverified. Add coordinates to zoom to this place.
+        </p>
+      )}
+      <button onClick={edit}>Edit place details / photo</button>
+    </section>
   );
 }

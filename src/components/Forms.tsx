@@ -362,6 +362,15 @@ export function PlaceForm({
           </>
         )}
         <label>
+          Photo URL
+          <input
+            type="url"
+            placeholder="https://…"
+            value={p.photoUrl ?? ""}
+            onChange={(e) => set({ ...p, photoUrl: e.target.value })}
+          />
+        </label>
+        <label>
           Opening hours / booking status
           <input
             value={p.opening ?? ""}

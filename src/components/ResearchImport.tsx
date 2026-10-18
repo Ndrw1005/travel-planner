@@ -189,9 +189,9 @@ export default function ResearchImport({
     });
     setText("");
   }
-  function save() {
+  function save(entries = drafts) {
     try {
-      const result = applyDrafts(trip, drafts);
+      const result = applyDrafts(trip, entries);
       if (JSON.stringify(result.trip).length > 2000000)
         throw new Error(
           "Trip data would exceed the safe device-storage budget. Export a backup and reduce source excerpts before importing.",
@@ -200,10 +200,33 @@ export default function ResearchImport({
       setMessages([
         `${result.added} price observations added; ${result.updated} hotel descriptions updated; ${result.duplicates} duplicate entries skipped. Existing history was preserved.`,
       ]);
-      setDrafts((ds) => ds.filter((d) => !d.selected || d.action === "skip"));
+      setDrafts((ds) =>
+        ds.filter(
+          (d) =>
+            !entries.some(
+              (entry) =>
+                entry.id === d.id && entry.selected && entry.action !== "skip",
+            ),
+        ),
+      );
     } catch (e) {
       setMessages([(e as Error).message]);
     }
+  }
+  function approveAndImport() {
+    const entries = drafts.map((d) => ({
+      ...d,
+      selected:
+        d.action !== "skip" &&
+        !trip.researchReceipts?.includes(d.fingerprint) &&
+        !trip.observations.some(
+          (o) => o.research?.fingerprint === d.fingerprint,
+        ),
+      reviewed: true,
+      contextConfirmed: true,
+    }));
+    setDrafts(entries);
+    save(entries);
   }
   const selected = drafts.filter((d) => d.selected && d.action !== "skip");
   const errors = selected.flatMap((d) => validation(d, trip));
@@ -853,7 +876,34 @@ export default function ResearchImport({
               </article>
             );
           })}
-          <div className="import-save panel">
+          <div
+            className="import-save panel"
+            aria-label="Save reviewed research"
+          >
+            <div>
+              <button
+                className="primary"
+                disabled={
+                  busy ||
+                  !drafts.some(
+                    (d) =>
+                      d.action !== "skip" &&
+                      !trip.researchReceipts?.includes(d.fingerprint) &&
+                      !trip.observations.some(
+                        (o) => o.research?.fingerprint === d.fingerprint,
+                      ),
+                  )
+                }
+                onClick={approveAndImport}
+              >
+                <Check size={16} /> Approve &amp; import all entries
+              </button>
+              <p>
+                Finished reviewing? This confirms the displayed details and
+                saves all entries to Flights or Hotels. Duplicates and skipped
+                entries are excluded.
+              </p>
+            </div>
             <div>
               <b>{selected.length} selected</b>
               <p>
@@ -865,7 +915,7 @@ export default function ResearchImport({
             <button
               className="primary"
               disabled={!selected.length || busy || errors.length > 0}
-              onClick={save}
+              onClick={() => save()}
             >
               <Check size={16} />
               Confirm import

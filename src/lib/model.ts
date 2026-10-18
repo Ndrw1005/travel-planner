@@ -17,6 +17,7 @@ export interface Place {
   minutes: number;
   cost: number;
   rating?: number;
+  photoUrl?: string;
   propertyId?: string;
   room?: string;
   amenities?: string;

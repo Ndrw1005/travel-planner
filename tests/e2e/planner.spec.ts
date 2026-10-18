@@ -92,3 +92,44 @@ test("manual price history does not mix currencies or bases", async ({
     page.getByLabel("Price history series").locator("option"),
   ).toHaveCount(4);
 });
+
+test("sidebar details and marker clicks zoom and show selected place information", async ({
+  page,
+}) => {
+  await open(page);
+  await nav(page, "Interactive map");
+  const canvas = page.locator(".map-canvas");
+  const panel = page.getByLabel("Selected place details");
+  const castle = page
+    .locator(".place-card")
+    .filter({ hasText: "Osaka Castle" });
+  await castle.getByRole("button", { name: "Details", exact: true }).click();
+  await expect(canvas).toHaveAttribute("data-focused-place", "castle");
+  await expect(canvas).toHaveAttribute("data-zoom", "16");
+  await expect(
+    panel.getByRole("heading", { name: "Osaka Castle", exact: true }),
+  ).toBeVisible();
+  await expect(panel).toContainText("Opening hours");
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await page.getByRole("button", { name: "Fit places", exact: true }).click();
+  await page
+    .locator(".leaflet-marker-icon")
+    .filter({ has: page.locator("span") })
+    .first()
+    .click();
+  await expect(canvas).toHaveAttribute("data-zoom", "16");
+  await expect(panel.locator(".place-detail-content")).toBeVisible();
+  await panel
+    .getByRole("button", { name: "Edit place details / photo" })
+    .click();
+  await page
+    .getByLabel("Opening hours / booking status")
+    .fill("09:00–17:00, verify before visiting");
+  await page.getByRole("button", { name: "Save place", exact: true }).click();
+  await expect(panel).toContainText("09:00–17:00");
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth > innerWidth,
+    ),
+  ).toBe(false);
+});

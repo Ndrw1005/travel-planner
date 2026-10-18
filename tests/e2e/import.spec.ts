@@ -280,12 +280,10 @@ test("approve all selects and reviews the batch while excluding skips and duplic
         .getByRole("checkbox", { name: "I checked this entry", exact: false }),
     ).toBeChecked();
     await expect(
-      entries
-        .nth(i)
-        .getByRole("checkbox", {
-          name: "I confirm these travel/stay",
-          exact: false,
-        }),
+      entries.nth(i).getByRole("checkbox", {
+        name: "I confirm these travel/stay",
+        exact: false,
+      }),
     ).toBeChecked();
   }
   await expect(
@@ -307,4 +305,34 @@ test("approve all selects and reviews the batch while excluding skips and duplic
       entries.nth(i).getByRole("checkbox", { name: `Select entry ${i + 1}` }),
     ).not.toBeChecked();
   }
+});
+
+test("bottom action approves and saves all parsed entries in one click", async ({
+  page,
+}) => {
+  await openImport(page);
+  await page
+    .getByLabel("Or paste copied website text")
+    .fill(pasted + "\n\n" + pasted.replace("Example Air", "Second Air"));
+  await page.getByRole("button", { name: "Extract pasted text" }).click();
+  const footer = page.getByLabel("Save reviewed research");
+  const lastEntry = page.locator(".import-entry").last();
+  const entryBox = await lastEntry.boundingBox();
+  const footerBox = await footer.boundingBox();
+  expect(footerBox!.y).toBeGreaterThanOrEqual(entryBox!.y + entryBox!.height);
+  await footer
+    .getByRole("button", { name: "Approve & import all entries", exact: true })
+    .click();
+  await expect(
+    page.getByText("2 price observations added;", { exact: false }),
+  ).toBeVisible();
+  await expect(page.locator(".import-entry")).toHaveCount(0);
+  const saved = await page.evaluate(
+    () => JSON.parse(localStorage.getItem("wayfarer-v1")!)[0],
+  );
+  expect(
+    saved.observations.filter((o: { name: string }) =>
+      ["Example Air", "Second Air"].includes(o.name),
+    ),
+  ).toHaveLength(2);
 });
