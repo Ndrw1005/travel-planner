@@ -1,3 +1,4 @@
+import DatasetImport from "./DatasetImport";
 import { useEffect, useRef, useState } from "react";
 import {
   UploadCloud,
@@ -68,6 +69,7 @@ export default function ResearchImport({
   initialKind?: "auto" | "flight" | "hotel";
   openMap: () => void;
 }) {
+  const [datasetFile, setDatasetFile] = useState<File>();
   const [drafts, setDrafts] = useState<Draft[]>([]),
     [documents, setDocuments] = useState<
       (ExtractedDocument & { url?: string })[]
@@ -131,6 +133,14 @@ export default function ResearchImport({
   }
   async function files(files: File[]) {
     if (busy) return;
+    if (
+      files.filter((file) => /\.(csv|json|zip)$/i.test(file.name)).length > 1
+    ) {
+      setMessages([
+        "Import one master JSON/ZIP or one CSV at a time. Use the master JSON to load all research together.",
+      ]);
+      return;
+    }
     if (files.length > 10) {
       setMessages(["Choose up to 10 files per batch."]);
       return;
@@ -141,10 +151,18 @@ export default function ResearchImport({
     for (const file of files) {
       if (abort.current.signal.aborted) break;
       try {
+        if (/\.(csv|zip)$/i.test(file.name)) {
+          setDatasetFile(file);
+          continue;
+        }
         if (/\.json$/i.test(file.name)) {
           if (file.size > 20 * 1024 * 1024)
             throw new Error("JSON backup exceeds 20 MB.");
           const data = JSON.parse(await file.text());
+          if (data?.metadata?.version === "2.0") {
+            setDatasetFile(file);
+            continue;
+          }
           validateResearchBackup(data);
           setBackup(data);
           continue;
@@ -240,6 +258,7 @@ export default function ResearchImport({
   );
   return (
     <>
+      <DatasetImport trip={trip} update={update} file={datasetFile} />
       <div className="section-heading">
         <div>
           <span className="eyebrow">YOUR RESEARCH, READY TO USE</span>
@@ -297,7 +316,7 @@ export default function ResearchImport({
             className="sr-only"
             aria-label="Research files"
             multiple
-            accept=".pdf,.png,.jpg,.jpeg,.json"
+            accept=".pdf,.png,.jpg,.jpeg,.json,.csv,.zip"
             disabled={busy}
             onChange={(e) => {
               void files(Array.from(e.target.files ?? []));

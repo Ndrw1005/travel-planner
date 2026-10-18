@@ -1,3 +1,4 @@
+import LocalPhoto from "./LocalPhoto";
 import { useEffect, useRef, useState } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -99,7 +100,11 @@ export default function MapWorkspace({
     >({}),
     [access, setAccess] = useState<{ id: string; minutes: number }[]>([]),
     [accessMessage, setAccessMessage] = useState("");
-  const mapPlaces = trip.places.map((p) => ({ ...p, ...resolved[p.id] }));
+  const mapPlaces = trip.places.map((p) =>
+    p.lat !== undefined && p.lng !== undefined
+      ? p
+      : { ...p, ...resolved[p.id] },
+  );
   const active = selected ?? hover;
   const [focusVersion, setFocusVersion] = useState(0);
   function selectPlace(id: string) {
@@ -179,7 +184,10 @@ export default function MapWorkspace({
     markers.current = [];
     const points = mapPlaces.filter(
       (p) =>
-        p.lat !== undefined && p.lng !== undefined && filters.includes(p.kind),
+        p.lat !== undefined &&
+        p.lng !== undefined &&
+        p.coordinateStatus !== "DO_NOT_GEOCODE_NO_UNIQUE_LISTING" &&
+        filters.includes(p.kind),
     );
     for (const p of points) {
       const index = day
@@ -590,6 +598,7 @@ export default function MapWorkspace({
   const shownPlaces = trip.places.filter(
     (p) =>
       filters.includes(p.kind) &&
+      p.coordinateStatus !== "DO_NOT_GEOCODE_NO_UNIQUE_LISTING" &&
       p.name.toLowerCase().includes(query.toLowerCase()),
   );
   return (
@@ -700,6 +709,24 @@ export default function MapWorkspace({
             </button>
           ))}
         </div>
+        {trip.places.some(
+          (p) => p.coordinateStatus === "DO_NOT_GEOCODE_NO_UNIQUE_LISTING",
+        ) && (
+          <details className="notice">
+            <summary>Location unknown</summary>
+            {trip.places
+              .filter(
+                (p) =>
+                  p.coordinateStatus === "DO_NOT_GEOCODE_NO_UNIQUE_LISTING",
+              )
+              .map((p) => (
+                <p key={p.id}>
+                  <button onClick={() => selectPlace(p.id)}>{p.name}</button> ·
+                  Unique listing needed
+                </p>
+              ))}
+          </details>
+        )}
         <div className="places-scroll">
           {shownPlaces.map((p) => (
             <article
@@ -1061,7 +1088,9 @@ function PlaceDetails({
     <section className="place-detail-content">
       <span className="badge">{place.kind}</span>
       <h2>{place.name}</h2>
-      {photo && failedPhoto !== photo ? (
+      {place.photoKey ? (
+        <LocalPhoto place={place} />
+      ) : photo && failedPhoto !== photo ? (
         <img
           className="place-detail-photo"
           src={photo}
@@ -1160,7 +1189,10 @@ function PlaceDetails({
         {(place.rating !== undefined || live?.rating != null) && (
           <>
             <dt>Saved rating</dt>
-            <dd>{place.rating ?? live?.rating} / 5</dd>
+            <dd>
+              {place.rating ?? live?.rating} / {place.ratingScale || 5}{" "}
+              {place.ratingProvider}
+            </dd>
           </>
         )}
         {place.notes && (

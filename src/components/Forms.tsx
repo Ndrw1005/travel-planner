@@ -1,3 +1,4 @@
+import LocationResolver from "./LocationResolver";
 import { useState, type ReactNode } from "react";
 import { X } from "lucide-react";
 import {
@@ -295,6 +296,19 @@ export function PlaceForm({
             onChange={(e) => set({ ...p, address: e.target.value })}
           />
         </label>
+        <LocationResolver
+          key={p.id}
+          place={p}
+          onConfirm={(lat, lng) =>
+            set({
+              ...p,
+              lat,
+              lng,
+              demo: false,
+              coordinateStatus: "USER_CONFIRMED",
+            })
+          }
+        />
         <div className="form-grid">
           <label>
             {p.kind === "hotel"

@@ -586,7 +586,12 @@ export default function App() {
                 </>
               )}
               {tab === "Attractions" && (
-                <Attractions trip={trip} update={update} edit={editPlace} />
+                <Attractions
+                  trip={trip}
+                  update={update}
+                  edit={editPlace}
+                  onImport={() => setTab("Import research")}
+                />
               )}{" "}
               {tab === "Daily itinerary" && (
                 <Itinerary

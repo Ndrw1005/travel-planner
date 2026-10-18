@@ -1,3 +1,5 @@
+import { closureOnDate } from "../lib/closures";
+import LocalPhoto from "./LocalPhoto";
 import { useState } from "react";
 import { ArrowDown, ArrowUp, GripVertical, Plus, Trash2 } from "lucide-react";
 import {
@@ -159,6 +161,12 @@ export function Itinerary({
                   {p?.opening || "Opening hours unverified"} · Travel estimate
                   unavailable until routed
                 </small>
+                {closureOnDate(p, day) && (
+                  <p className="warning" role="alert">
+                    {closureOnDate(p, day)} · Check this against your planned date{" "}
+                    {day}.
+                  </p>
+                )}
                 {problems[i] && <p className="warning">{problems[i]}</p>}
               </div>
               <label>
@@ -297,26 +305,37 @@ export function Hotels({
       </div>
       <div className="cards-grid">
         {hotels.map((p) => {
+          const latest = trip.observations
+            .filter((o) => o.kind === "hotel" && o.itemId === p.id)
+            .sort((a, b) => b.at.localeCompare(a.at))[0];
           const score = scoreHotel(
             p.cost || undefined,
             travelMinutes[p.id],
-            p.rating,
+            p.rating === undefined
+              ? undefined
+              : (p.rating * 5) / (p.ratingScale || 5),
             weights,
           );
           return (
             <article className="panel hotel-card" key={p.id}>
-              <div className="hotel-illustration">
-                <span>
-                  {p.name.includes("Umeda")
-                    ? "梅田"
-                    : p.name.includes("Namba")
-                      ? "難波"
-                      : "大阪"}
-                </span>
-                <small>
-                  {p.demo ? "ILLUSTRATIVE HOTEL OPTION" : "PROPERTY TO VERIFY"}
-                </small>
-              </div>
+              {p.photoKey || p.photoUrl ? (
+                <LocalPhoto place={p} />
+              ) : (
+                <div className="hotel-illustration">
+                  <span>
+                    {p.name.includes("Umeda")
+                      ? "梅田"
+                      : p.name.includes("Namba")
+                        ? "難波"
+                        : "大阪"}
+                  </span>
+                  <small>
+                    {p.demo
+                      ? "ILLUSTRATIVE HOTEL OPTION"
+                      : "PROPERTY TO VERIFY"}
+                  </small>
+                </div>
+              )}
               <span className="badge">
                 {trip.baseId === p.id
                   ? "Selected base"
@@ -327,8 +346,16 @@ export function Hotels({
               <h2>{p.name}</h2>
               <p>{p.address}</p>
               <div className="price">
-                {p.cost ? money(p.cost, "JPY") : "No price recorded"}
-                <small> total stay estimate</small>
+                {latest
+                  ? money(latest.amount, latest.currency)
+                  : p.cost
+                    ? money(p.cost, "JPY")
+                    : "No price recorded"}
+                <small>
+                  {latest
+                    ? ` ${latest.research?.details.priceScope || latest.basis} · recorded ${latest.at.slice(0, 10)}`
+                    : " total stay estimate"}
+                </small>
               </div>
               {trip.observations
                 .filter(
@@ -374,6 +401,14 @@ export function Hotels({
               <dl>
                 <dt>Room</dt>
                 <dd>{p.room || "Unknown"}</dd>
+                {p.rating !== undefined && (
+                  <>
+                    <dt>{p.ratingProvider || "Saved"} rating</dt>
+                    <dd>
+                      {p.rating} / {p.ratingScale || 5}
+                    </dd>
+                  </>
+                )}
                 <dt>Amenities</dt>
                 <dd>{p.amenities || "Unknown"}</dd>
                 <dt>Cancellation</dt>
@@ -417,10 +452,12 @@ export function Attractions({
   trip,
   update,
   edit,
+  onImport,
 }: {
   trip: Trip;
   update: (t: Trip) => void;
   edit: (p?: Place) => void;
+  onImport: () => void;
 }) {
   const [query, setQuery] = useState(""),
     [traveler, setTraveler] = useState(trip.travelers[0]);
@@ -431,6 +468,7 @@ export function Attractions({
           <span className="eyebrow">THE REASON WE TRAVEL</span>
           <h2>Places worth making time for.</h2>
         </div>
+        <button onClick={onImport}>Import researched dataset</button>
         <button className="primary" onClick={() => edit()}>
           Add place
         </button>
@@ -464,6 +502,14 @@ export function Attractions({
               <span className="badge">{p.priority}</span>
               <h2>{p.name}</h2>
               <p>{p.notes}</p>
+              {p.closureWarning && (
+                <p className="warning">{p.closureWarning}</p>
+              )}
+              {p.officialUrl && /^https?:\/\//i.test(p.officialUrl) && (
+                <a href={p.officialUrl} target="_blank" rel="noreferrer">
+                  Official information ↗
+                </a>
+              )}
               <p>
                 {p.minutes} min planned ·{" "}
                 {p.cost ? money(p.cost, "JPY") : "Admission unknown"}

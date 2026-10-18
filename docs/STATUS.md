@@ -1,3 +1,11 @@
+# Structured research v2 — October 18, 2026
+
+Added private CSV/JSON/ZIP research import, field-level conflict review, stable property identities, idempotent observations, automatic version-1 trip backups, import history, private IndexedDB photos, separate one-way/round-trip flight views, date-specific closure warnings, and confirmed address/coordinate lookup. Hotel cards display their latest imported prices with scope and currency. Existing saved trip storage is additive and is not reset.
+
+Validated the supplied master JSON (122 records), three CSVs, desktop/mobile import workflows, hotel price display, photo ZIP handling and location confirmation. Actual research files are read locally for validation and are not committed or published. Missing photo assets remain placeholders. See [Research datasets](RESEARCH_DATASETS.md).
+
+---
+
 # Smart Import enhancement — October 18, 2026
 
 Added browser-only PDF/screenshot/text import, editable review and explicit reconciliation actions, additive source metadata, history-safe comparison grouping, duplicate fingerprints, research JSON backup/merge, and optional saved-hotel linking through map search. Existing storage keys and trip formats remain intact.

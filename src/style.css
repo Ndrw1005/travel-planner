@@ -2024,3 +2024,68 @@ footer button {
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+.dataset-import {
+  margin-bottom: 28px;
+}
+.dataset-rows {
+  max-height: 600px;
+  overflow: auto;
+  margin: 20px 0;
+}
+.dataset-row {
+  padding: 14px;
+  border-bottom: 1px solid var(--border);
+  overflow-wrap: anywhere;
+}
+.dataset-row summary {
+  cursor: pointer;
+  line-height: 1.8;
+}
+.dataset-row summary input {
+  width: auto;
+  margin-right: 10px;
+}
+.dataset-row dl {
+  display: block;
+}
+.dataset-row dt {
+  font-weight: 600;
+}
+.dataset-row dd {
+  margin: 4px 0 12px;
+}
+.location-resolver {
+  margin: 18px 0;
+  padding: 15px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.hotel-card .price small {
+  overflow-wrap: anywhere;
+  line-height: 1.5;
+}
+.section-heading > .row {
+  min-width: 0;
+  max-width: 100%;
+  flex-shrink: 1;
+}
+.location-resolver {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.location-resolver button {
+  max-width: 100%;
+  white-space: normal;
+}
+@media (max-width: 700px) {
+  .section-heading > .row {
+    width: 100%;
+  }
+  .modal-backdrop {
+    padding: 12px;
+  }
+  .modal {
+    max-height: calc(100dvh - 24px);
+  }
+}

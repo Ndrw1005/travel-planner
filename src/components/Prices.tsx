@@ -47,10 +47,32 @@ export default function Prices({
     [alerts, setAlerts] = useState<
       { id: string; message: string; created_at: string }[]
     >([]);
-  const observations = [
+  const [direction, setDirection] = useState("all"),
+    [sort, setSort] = useState("price");
+  const allObservations = [
     ...trip.observations.filter((o) => o.kind === kind),
     ...live,
   ];
+  const observations = allObservations
+    .filter(
+      (o) =>
+        kind !== "flight" ||
+        direction === "all" ||
+        o.flightDirection === direction,
+    )
+    .sort((a, b) =>
+      sort === "departure"
+        ? (a.research?.details.departure || "").localeCompare(
+            b.research?.details.departure || "",
+          )
+        : a.currency.localeCompare(b.currency) || a.amount - b.amount,
+    );
+  const outbound = allObservations
+    .filter((o) => o.flightDirection === "outbound" && o.currency === "USD")
+    .sort((a, b) => a.amount - b.amount)[0];
+  const inbound = allObservations
+    .filter((o) => o.flightDirection === "return" && o.currency === "USD")
+    .sort((a, b) => a.amount - b.amount)[0];
   const groups = [
     ...new Set(
       observations.map((o) => JSON.stringify([o.itemId, o.currency, o.basis])),
@@ -132,6 +154,7 @@ export default function Prices({
             <UploadCloud size={16} />
             Import Research
           </button>
+          <button onClick={onImport}>Import researched dataset</button>
           <button onClick={() => setWatching(true)}>
             <Bell size={16} />
             New price watch
@@ -153,6 +176,42 @@ export default function Prices({
         <p role="status" className="notice">
           {message}
         </p>
+      )}
+      {kind === "flight" && (
+        <div className="panel">
+          <div className="row wrap">
+            {[
+              ["all", "All flights"],
+              ["outbound", "Outbound one-way"],
+              ["return", "Return one-way"],
+              ["round-trip", "Historical round-trip"],
+            ].map(([value, label]) => (
+              <button
+                key={value}
+                className={direction === value ? "primary" : ""}
+                onClick={() => setDirection(value)}
+              >
+                {label}
+              </button>
+            ))}
+            <label>
+              Sort flights
+              <select value={sort} onChange={(e) => setSort(e.target.value)}>
+                <option value="price">Price (within currency)</option>
+                <option value="departure">Departure time</option>
+              </select>
+            </label>
+          </div>
+          {outbound && inbound && (
+            <p className="notice">
+              Arithmetic illustration only: {money(outbound.amount, "USD")}{" "}
+              outbound + {money(inbound.amount, "USD")} return ={" "}
+              {money(outbound.amount + inbound.amount, "USD")} per adult. This
+              is NOT a verified round-trip fare or bookable pairing; baggage and
+              terms need checking.
+            </p>
+          )}
+        </div>
       )}
       <div className="stats-grid">
         {[
@@ -235,6 +294,16 @@ export default function Prices({
             </div>
             <div className="grow">
               <h3>{o.name}</h3>
+              {o.flightDirection && (
+                <span className="badge">
+                  {o.flightDirection === "round-trip"
+                    ? "Historical round-trip quote"
+                    : `${o.flightDirection} · one-way per adult`}
+                </span>
+              )}
+              {kind === "flight" && o.research && (
+                <p>Baggage: {o.research.details.baggage || "Unknown"}</p>
+              )}
               {kind === "flight" && o.research && (
                 <p className="flight-times">
                   <strong>

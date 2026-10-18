@@ -18,6 +18,16 @@ export interface Place {
   cost: number;
   rating?: number;
   photoUrl?: string;
+  photoKey?: string;
+  researchKey?: string;
+  researchKeys?: string[];
+  researchData?: Record<string, string>;
+  coordinateStatus?: string;
+  mapQuery?: string;
+  officialUrl?: string;
+  closureWarning?: string;
+  ratingScale?: number;
+  ratingProvider?: string;
   propertyId?: string;
   room?: string;
   amenities?: string;
@@ -26,6 +36,8 @@ export interface Place {
   votes: string[];
 }
 export interface Observation {
+  researchKey?: string;
+  flightDirection?: "outbound" | "return" | "round-trip";
   id: string;
   itemId: string;
   name: string;
@@ -70,6 +82,16 @@ export interface Watch {
   newLow?: boolean;
 }
 export interface Trip {
+  datasetImports?: {
+    id: string;
+    at: string;
+    name: string;
+    added: number;
+    matched: number;
+    skipped: number;
+    needingConfirmation: number;
+    issues: string[];
+  }[];
   researchReceipts?: string[];
   id: string;
   name: string;
