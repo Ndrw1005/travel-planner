@@ -208,3 +208,50 @@ describe("review, matching, history and safe persistence", () => {
     expect(() => mergeResearch(trip, { format: "bad" })).toThrow();
   });
 });
+
+it("imports shorthand and dotted flight times and explicit footer currency", () => {
+  const rows = parseDocument(
+    document(
+      "Google Flights\n3pm ~ 5pm\nPeach\n$410\n7:30 a.m. – 10:00 a.m. +1\nJetstar\n$450\nCurrency USD",
+    ),
+    trip,
+  );
+  expect(
+    rows.map((d) => [
+      d.details.departure.trim(),
+      d.details.arrival.trim(),
+      d.currency,
+    ]),
+  ).toEqual([
+    ["3pm", "5pm", "USD"],
+    ["7:30 a.m.", "10:00 a.m. +1", "USD"],
+  ]);
+});
+it("replaces flights atomically, retains hotels, and allows repeating a replacement", () => {
+  const rows = parseDocument(
+    document("Airline: Replacement Air\n3pm ~ 5pm\nUSD 410"),
+    trip,
+  ).map(confirm);
+  const oldHotels = trip.observations.filter((o) => o.kind === "hotel");
+  const result = applyDrafts(trip, rows, { replaceFlights: true }).trip;
+  expect(result.observations.filter((o) => o.kind === "flight")).toHaveLength(
+    1,
+  );
+  expect(result.observations.filter((o) => o.kind === "hotel")).toEqual(
+    oldHotels,
+  );
+  expect(
+    applyDrafts(result, rows, {
+      replaceFlights: true,
+    }).trip.observations.filter((o) => o.kind === "flight"),
+  ).toHaveLength(1);
+  const original = structuredClone(result);
+  expect(() =>
+    applyDrafts(
+      result,
+      rows.map((d) => ({ ...d, currency: "" })),
+      { replaceFlights: true },
+    ),
+  ).toThrow("currency");
+  expect(result).toEqual(original);
+});

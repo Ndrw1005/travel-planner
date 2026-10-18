@@ -235,6 +235,14 @@ export default function Prices({
             </div>
             <div className="grow">
               <h3>{o.name}</h3>
+              {kind === "flight" && o.research && (
+                <p className="flight-times">
+                  <strong>
+                    {o.research.details.departure || "Departure time unknown"} →{" "}
+                    {o.research.details.arrival || "Arrival time unknown"}
+                  </strong>
+                </p>
+              )}
               <p>{o.notes}</p>
               <small>
                 {o.research

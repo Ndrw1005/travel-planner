@@ -200,7 +200,43 @@ function record(d: Draft): ResearchRecord {
     comparable: comparable(d),
   };
 }
-export function applyDrafts(trip: Trip, drafts: Draft[]) {
+export function applyDrafts(
+  trip: Trip,
+  drafts: Draft[],
+  options: { replaceFlights?: boolean } = {},
+) {
+  const replaceFlights =
+    options.replaceFlights &&
+    drafts.some(
+      (d) => d.kind === "flight" && d.selected && d.action !== "skip",
+    );
+  if (replaceFlights) {
+    // Validate the replacement before removing anything from the cloned trip.
+    const problems = drafts.flatMap((d) =>
+      validation(d, trip).map((e) => `${d.name || "Entry"}: ${e}`),
+    );
+    if (problems.length) throw new Error(problems.join("\n"));
+    const fingerprints = new Set(
+      trip.observations
+        .filter((o) => o.kind === "flight")
+        .map((o) => o.research?.fingerprint),
+    );
+    drafts
+      .filter((d) => d.kind === "flight")
+      .forEach((d) => fingerprints.add(d.fingerprint));
+    trip = {
+      ...trip,
+      observations: trip.observations.filter((o) => o.kind !== "flight"),
+      researchReceipts: trip.researchReceipts?.filter(
+        (f) => !fingerprints.has(f),
+      ),
+    };
+    drafts = drafts.map((d) =>
+      d.kind === "flight"
+        ? { ...d, action: d.action === "skip" ? "skip" : "new", matchId: "" }
+        : d,
+    );
+  }
   let next = structuredClone(trip);
   let added = 0,
     updated = 0,

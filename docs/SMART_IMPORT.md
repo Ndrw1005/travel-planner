@@ -1,3 +1,9 @@
+## Flight imports replace the previous batch
+
+Each successful PDF/image/pasted/manual research import containing selected flights replaces all saved flight observations for the current trip. Hotels and their history are retained. Validation runs first; a failed or empty flight import does not delete anything. Reimporting the same flight document replaces the batch without double counting. JSON backup merging remains a separate recovery operation.
+
+The footer shows exact validation errors instead of silently disabling Confirm import. If the source only displays `$`, choose **Currency for entries with an unknown currency** once to fill all missing currencies. Explicit currency settings such as `Currency USD` are read automatically. Departure and arrival times support `3pm ~ 5pm`, `3:00 PM – 5:00 PM`, 24-hour times, dotted a.m./p.m., and next-day offsets; saved flights show the time range prominently. Return schedules are still not invented.
+
 # Smart Research Import
 
 Use **Import Research** on Flights or Hotels, or **Import research** in the sidebar. Normal price updates happen entirely inside the website. They do not need Codex, a new GitHub deployment, an API key, or a Supabase account.

@@ -40,7 +40,7 @@ test("paste, edit, confirm and deduplicate without credentials", async ({
   await page.getByRole("button", { name: "Extract pasted text" }).click();
   await expect(
     page.getByRole("checkbox", { name: "Select entry 1" }),
-  ).toBeDisabled();
+  ).toBeEnabled();
   const saved = await page.evaluate(
     () => JSON.parse(localStorage.getItem("wayfarer-v1")!)[0],
   );
@@ -256,12 +256,13 @@ test("approve all selects and reviews the batch while excluding skips and duplic
   page,
 }) => {
   await openImport(page);
+  const hotel = pasted.replace("Airline:", "Hotel:");
   const batch =
-    pasted +
+    hotel +
     "\n\n" +
-    pasted.replace("Example Air", "Second Air") +
+    hotel.replace("Example Air", "Second Air") +
     "\n\n" +
-    pasted.replace("Example Air", "Skipped Air");
+    hotel.replace("Example Air", "Skipped Air");
   await page.getByLabel("Or paste copied website text").fill(batch);
   await page.getByRole("button", { name: "Extract pasted text" }).click();
   const entries = page.locator(".import-entry");
@@ -335,4 +336,61 @@ test("bottom action approves and saves all parsed entries in one click", async (
       ["Example Air", "Second Air"].includes(o.name),
     ),
   ).toHaveLength(2);
+});
+
+test("unknown dollar currency is resolved once and flight imports replace the previous batch", async ({
+  page,
+}) => {
+  await openImport(page);
+  const batch =
+    "Airline: New Flight A\n3pm ~ 5pm\n$410\nAirline: New Flight B\n7am ~ 9am\n$450";
+  await page.getByLabel("Or paste copied website text").fill(batch);
+  await page.getByRole("button", { name: "Extract pasted text" }).click();
+  await page
+    .getByRole("button", { name: "Approve & import all entries", exact: true })
+    .click();
+  const footer = page.getByLabel("Save reviewed research");
+  await expect(footer.getByRole("alert")).toContainText(
+    "Choose a supported currency",
+  );
+  await expect(
+    footer.getByRole("button", { name: "Confirm import", exact: true }),
+  ).toBeEnabled();
+  await page
+    .getByLabel("Currency for entries with an unknown currency", {
+      exact: false,
+    })
+    .selectOption("USD");
+  await footer
+    .getByRole("button", { name: "Confirm import", exact: true })
+    .click();
+  await expect(
+    page.getByText("2 price observations added;", { exact: false }),
+  ).toBeVisible();
+  let saved = await page.evaluate(
+    () => JSON.parse(localStorage.getItem("wayfarer-v1")!)[0],
+  );
+  expect(
+    saved.observations.filter((o: { kind: string }) => o.kind === "flight"),
+  ).toHaveLength(2);
+  await page
+    .getByLabel("Or paste copied website text")
+    .fill("Airline: Latest Flight\n11am ~ 1pm\nUSD 500");
+  await page.getByRole("button", { name: "Extract pasted text" }).click();
+  await page
+    .getByRole("button", { name: "Approve & import all entries", exact: true })
+    .click();
+  saved = await page.evaluate(
+    () => JSON.parse(localStorage.getItem("wayfarer-v1")!)[0],
+  );
+  expect(
+    saved.observations.filter((o: { kind: string }) => o.kind === "flight"),
+  ).toHaveLength(1);
+  const menu = page.getByRole("button", { name: "Open navigation" });
+  if (await menu.isVisible()) await menu.click();
+  await page
+    .locator("nav")
+    .getByRole("button", { name: "Flights", exact: true })
+    .click();
+  await expect(page.locator(".flight-times")).toContainText("11am → 1pm");
 });

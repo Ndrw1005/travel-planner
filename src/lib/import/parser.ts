@@ -72,14 +72,14 @@ function context(text: string): Partial<ResearchDetails> {
       "",
   };
 }
+const timePattern =
+  /\b(?:\d{1,2}:\d{2}\s*(?:[ap]\.?\s*m\.?)?|\d{1,2}\s*[ap]\.?\s*m\.?)(?:\s*\+\d)?/gi;
 function details(
   block: string,
   head: Partial<ResearchDetails>,
   kind: "flight" | "hotel",
 ): ResearchDetails {
-  const times = [
-    ...block.matchAll(/\b\d{1,2}:\d{2}\s*(?:AM|PM)?(?:\s*\+\d)?/gi),
-  ].map((m) => m[0]);
+  const times = [...block.matchAll(timePattern)].map((m) => m[0]);
   const d = { ...emptyDetails(), ...head };
   if (kind === "flight")
     Object.assign(d, {
@@ -185,18 +185,31 @@ export function parseDocument(
       if (h.kind !== "flight") continue;
       const lower = hi ? heads[hi - 1].i + 1 : 0;
       for (let j = h.i - 1; j >= Math.max(lower, h.i - 3); j--) {
-        if (
-          (lines[j].match(/\b\d{1,2}:\d{2}\s*(?:AM|PM)?/gi) || []).length >= 2
-        ) {
+        if ((lines[j].match(timePattern) || []).length >= 2) {
           h.i = j;
           break;
         }
       }
     }
-    const currencyHint = lines
-      .find((l) => /^Currency\s*:\s*(USD|JPY|TWD)\s*$/i.test(l))
-      ?.match(/(USD|JPY|TWD)\s*$/i)?.[1]
-      .toUpperCase() as Draft["currency"] | undefined;
+    const currencyHints = [
+      ...new Set(
+        lines
+          .filter(
+            (line) =>
+              /\bcurrency\b/i.test(line) ||
+              /^\s*(?:USD|JPY|TWD)(?:\s*[-–]\s*[^0-9]+)?\s*$/i.test(line),
+          )
+          .flatMap((line) =>
+            [...line.matchAll(/\b(USD|JPY|TWD)\b/gi)].map((m) =>
+              m[1].toUpperCase(),
+            ),
+          ),
+      ),
+    ];
+    const currencyHint =
+      currencyHints.length === 1
+        ? (currencyHints[0] as Draft["currency"])
+        : undefined;
     const occurrences = new Map<string, number>();
     const header = context(
       lines

@@ -109,7 +109,7 @@ export default function ResearchImport({
     );
   function addDocument(doc: ExtractedDocument, url?: string) {
     const rows = parseDocument(doc, trip, format).map((d) =>
-      suggestMatches(d, trip),
+      d.kind === "hotel" ? suggestMatches(d, trip) : d,
     );
     if (rows.length > 200)
       throw new Error(
@@ -189,16 +189,25 @@ export default function ResearchImport({
     });
     setText("");
   }
+  function isDuplicate(d: Draft) {
+    return (
+      d.kind !== "flight" &&
+      (trip.researchReceipts?.includes(d.fingerprint) ||
+        trip.observations.some(
+          (o) => o.research?.fingerprint === d.fingerprint,
+        ))
+    );
+  }
   function save(entries = drafts) {
     try {
-      const result = applyDrafts(trip, entries);
+      const result = applyDrafts(trip, entries, { replaceFlights: true });
       if (JSON.stringify(result.trip).length > 2000000)
         throw new Error(
           "Trip data would exceed the safe device-storage budget. Export a backup and reduce source excerpts before importing.",
         );
       update(result.trip);
       setMessages([
-        `${result.added} price observations added; ${result.updated} hotel descriptions updated; ${result.duplicates} duplicate entries skipped. Existing history was preserved.`,
+        `${result.added} price observations added; ${result.updated} hotel descriptions updated; ${result.duplicates} duplicate entries skipped. Previous flights were replaced when flights were imported. Hotel history was preserved.`,
       ]);
       setDrafts((ds) =>
         ds.filter(
@@ -216,12 +225,7 @@ export default function ResearchImport({
   function approveAndImport() {
     const entries = drafts.map((d) => ({
       ...d,
-      selected:
-        d.action !== "skip" &&
-        !trip.researchReceipts?.includes(d.fingerprint) &&
-        !trip.observations.some(
-          (o) => o.research?.fingerprint === d.fingerprint,
-        ),
+      selected: d.action !== "skip" && !isDuplicate(d),
       reviewed: true,
       contextConfirmed: true,
     }));
@@ -229,7 +233,11 @@ export default function ResearchImport({
     save(entries);
   }
   const selected = drafts.filter((d) => d.selected && d.action !== "skip");
-  const errors = selected.flatMap((d) => validation(d, trip));
+  const errors = selected.flatMap((d) =>
+    validation(d, trip).map(
+      (error) => `${d.name || "Unnamed entry"}: ${error}`,
+    ),
+  );
   return (
     <>
       <div className="section-heading">
@@ -532,11 +540,7 @@ export default function ResearchImport({
                 onClick={() =>
                   setDrafts((ds) =>
                     ds.map((d) => {
-                      const duplicate =
-                        trip.researchReceipts?.includes(d.fingerprint) ||
-                        trip.observations.some(
-                          (o) => o.research?.fingerprint === d.fingerprint,
-                        );
+                      const duplicate = isDuplicate(d);
                       return duplicate || d.action === "skip"
                         ? { ...d, selected: false }
                         : {
@@ -590,11 +594,7 @@ export default function ResearchImport({
                         .map((o) => [o.itemId, { id: o.itemId, name: o.name }]),
                     ).values(),
                   );
-            const duplicate =
-              trip.researchReceipts?.includes(d.fingerprint) ||
-              trip.observations.some(
-                (o) => o.research?.fingerprint === d.fingerprint,
-              );
+            const duplicate = isDuplicate(d);
             return (
               <article className="panel import-entry" key={d.id}>
                 <div className="section-heading">
@@ -799,11 +799,15 @@ export default function ResearchImport({
                       }
                     >
                       <option value="new">
-                        Create a separate candidate + observation
+                        {d.kind === "flight"
+                          ? "Replace saved flights with this batch"
+                          : "Create a separate candidate + observation"}
                       </option>
-                      <option value="observation">
-                        Add observation to an existing candidate
-                      </option>
+                      {d.kind === "hotel" && (
+                        <option value="observation">
+                          Add observation to an existing candidate
+                        </option>
+                      )}
                       {d.kind === "hotel" && (
                         <option value="update">
                           Update hotel description only (no price)
@@ -885,14 +889,7 @@ export default function ResearchImport({
                 className="primary"
                 disabled={
                   busy ||
-                  !drafts.some(
-                    (d) =>
-                      d.action !== "skip" &&
-                      !trip.researchReceipts?.includes(d.fingerprint) &&
-                      !trip.observations.some(
-                        (o) => o.research?.fingerprint === d.fingerprint,
-                      ),
-                  )
+                  !drafts.some((d) => d.action !== "skip" && !isDuplicate(d))
                 }
                 onClick={approveAndImport}
               >
@@ -900,8 +897,9 @@ export default function ResearchImport({
               </button>
               <p>
                 Finished reviewing? This confirms the displayed details and
-                saves all entries to Flights or Hotels. Duplicates and skipped
-                entries are excluded.
+                saves the batch. Imported flights replace all previously saved
+                flights. Hotel history stays intact. Skipped entries are
+                excluded.
               </p>
             </div>
             <div>
@@ -909,12 +907,48 @@ export default function ResearchImport({
               <p>
                 {errors.length
                   ? `${errors.length} review issues remain. Complete each selected entry before saving.`
-                  : "Existing history is preserved. Incomplete conditions remain in separate uncertain series."}
+                  : "Flight imports replace previously saved flights. Hotel history is retained."}
               </p>
             </div>
+            {errors.length > 0 && (
+              <div
+                className="notice"
+                role="alert"
+                style={{ flexBasis: "100%" }}
+              >
+                <b>Fix these fields to import:</b>
+                <ul>
+                  {errors.map((error, i) => (
+                    <li key={i}>{error}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {drafts.some((d) => !d.currency && d.action !== "skip") && (
+              <label>
+                Currency for entries with an unknown currency
+                <select
+                  defaultValue=""
+                  onChange={(e) => {
+                    const currency = e.target.value as Draft["currency"];
+                    if (currency)
+                      setDrafts((ds) =>
+                        ds.map((d) => (!d.currency ? { ...d, currency } : d)),
+                      );
+                  }}
+                >
+                  <option value="">Choose once for all unknown prices…</option>
+                  <option value="USD">USD — US dollars</option>
+                  <option value="TWD">TWD — Taiwan dollars</option>
+                  <option value="JPY">JPY — Japanese yen</option>
+                </select>
+                A bare $ does not identify its currency. This applies your
+                choice to all entries missing currency.
+              </label>
+            )}
             <button
               className="primary"
-              disabled={!selected.length || busy || errors.length > 0}
+              disabled={!selected.length || busy}
               onClick={() => save()}
             >
               <Check size={16} />
