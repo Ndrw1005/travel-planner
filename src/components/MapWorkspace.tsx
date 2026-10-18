@@ -1,3 +1,4 @@
+import LocatePlaces from "./LocatePlaces";
 import LocalPhoto from "./LocalPhoto";
 import { useEffect, useRef, useState } from "react";
 import L from "leaflet";
@@ -490,7 +491,7 @@ export default function MapWorkspace({
     if (root.current) {
       root.current.dataset.focusedPlace = selected;
     }
-  }, [selected, focusVersion, loaded, resolved]);
+  }, [selected, focusVersion, loaded, resolved, trip.places]);
   const dayGeneration = useRef(0);
   useEffect(() => {
     if (!day) dayGeneration.current++;
@@ -599,7 +600,9 @@ export default function MapWorkspace({
     (p) =>
       filters.includes(p.kind) &&
       p.coordinateStatus !== "DO_NOT_GEOCODE_NO_UNIQUE_LISTING" &&
-      p.name.toLowerCase().includes(query.toLowerCase()),
+      `${p.name} ${p.address || ""}`
+        .toLowerCase()
+        .includes(query.toLowerCase()),
   );
   return (
     <div className={`map-workspace ${panelOpen ? "with-details" : ""}`}>
@@ -684,6 +687,28 @@ export default function MapWorkspace({
             </button>
           </div>
         ))}
+        <LocatePlaces
+          places={trip.places}
+          destination={trip.destination}
+          save={(locations) => {
+            update({
+              ...trip,
+              places: trip.places.map((p) =>
+                locations[p.id]
+                  ? {
+                      ...p,
+                      lat: locations[p.id].lat,
+                      lng: locations[p.id].lng,
+                      demo: false,
+                      coordinateStatus: "USER_CONFIRMED",
+                    }
+                  : p,
+              ),
+            });
+            const first = Object.keys(locations)[0];
+            if (first) selectPlace(first);
+          }}
+        />
         <div className="filter-chips">
           {(
             [
@@ -827,7 +852,7 @@ export default function MapWorkspace({
         <div className="map-top">
           <span className="map-label">
             <Layers size={14} />
-            {googleKey ? "Google Maps" : "Explore mode · demo markers"}
+            {googleKey ? "Google Maps" : "OpenStreetMap · saved places"}
           </span>
           <button
             onClick={() => {

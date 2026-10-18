@@ -237,3 +237,95 @@ test("ZIP photos stay in IndexedDB and unsafe ZIP paths are rejected", async ({
   });
   await expect(page.getByRole("status")).toContainText("Unsafe ZIP path");
 });
+
+test("saved addresses can be located together directly on the map and persist after reload", async ({
+  page,
+}) => {
+  const queries: string[] = [];
+  await page.route("https://photon.komoot.io/**", async (route) => {
+    queries.push(new URL(route.request().url()).searchParams.get("q")!);
+    await route.fulfill({
+      json: {
+        features: [
+          {
+            geometry: { coordinates: [135.2, 34.1] },
+            properties: {
+              name: "Review this hotel",
+              osm_value: "hotel",
+              city: "Test city",
+            },
+          },
+          {
+            geometry: { coordinates: [135.3, 34.2] },
+            properties: { name: "Nearby station", osm_value: "station" },
+          },
+        ],
+      },
+    });
+  });
+  await page.goto("./");
+  await page.getByRole("button", { name: "Open trip", exact: true }).click();
+  await nav(page, "Import research");
+  await upload(page);
+  await page
+    .getByRole("button", { name: "Import selected dataset records" })
+    .click();
+  await expect(
+    page.getByRole("status").filter({ hasText: "Dataset saved" }),
+  ).toBeVisible();
+  await nav(page, "Interactive map");
+  await page
+    .getByRole("button", { name: "Locate saved places", exact: true })
+    .click();
+  const review = page.getByRole("region", { name: "Locate saved places" });
+  await review.getByRole("button", { name: /^Find locations/ }).click();
+  await expect(review.getByRole("status")).toContainText("Review the matches", {
+    timeout: 20000,
+  });
+  const hotel = review
+    .locator(".location-review-item")
+    .filter({ hasText: "Synthetic Research Hotel" });
+  const museum = review
+    .locator(".location-review-item")
+    .filter({ hasText: "Synthetic Museum" });
+  await expect(hotel.getByRole("radio")).toHaveCount(2);
+  await expect(
+    page.locator('.leaflet-marker-icon[title="Synthetic Research Hotel"]'),
+  ).toHaveCount(0);
+  await expect(
+    review.getByRole("button", { name: "Save selected pins (0)" }),
+  ).toBeDisabled();
+  await hotel.getByRole("radio").first().check();
+  await museum.getByRole("radio").last().check();
+  await review.getByRole("button", { name: "Save selected pins (2)" }).click();
+  await expect(
+    page.locator('.leaflet-marker-icon[title="Synthetic Research Hotel"]'),
+  ).toHaveCount(1);
+  await expect(
+    page.locator('.leaflet-marker-icon[title="Synthetic Museum"]'),
+  ).toHaveCount(1);
+  await expect(page.locator(".map-canvas")).toHaveAttribute("data-zoom", "16");
+  const saved = await page.evaluate(
+    () => JSON.parse(localStorage.getItem("wayfarer-v1")!)[0].places,
+  );
+  expect(
+    saved.find((p: { name: string }) => p.name === "Synthetic Research Hotel"),
+  ).toMatchObject({
+    lat: 34.1,
+    lng: 135.2,
+    coordinateStatus: "USER_CONFIRMED",
+  });
+  expect(
+    saved.find((p: { name: string }) => p.name === "Synthetic Museum"),
+  ).toMatchObject({ lat: 34.2, lng: 135.3 });
+  expect(queries.some((q) => q.includes("Synthetic Research Hotel"))).toBe(
+    true,
+  );
+  const lookupCount = queries.length;
+  await page.reload();
+  await nav(page, "Interactive map");
+  await expect(
+    page.locator('.leaflet-marker-icon[title="Synthetic Research Hotel"]'),
+  ).toHaveCount(1);
+  expect(queries).toHaveLength(lookupCount);
+});

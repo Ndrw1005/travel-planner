@@ -2089,3 +2089,38 @@ footer button {
     max-height: calc(100dvh - 24px);
   }
 }
+
+.locate-places {
+  margin: 12px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.locate-places button {
+  max-width: 100%;
+  white-space: normal;
+  margin: 4px 0;
+}
+.location-review-list {
+  max-height: 420px;
+  overflow-y: auto;
+}
+.location-review-item {
+  padding: 14px 0;
+  border-bottom: 1px solid #dce3da;
+}
+.location-candidate {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 0;
+  font-size: 13px;
+}
+.location-candidate input {
+  width: auto;
+  flex: 0 0 auto;
+  margin-top: 4px;
+}
+.locate-places small {
+  display: block;
+  margin-top: 8px;
+}

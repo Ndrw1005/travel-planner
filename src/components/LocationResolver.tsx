@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { type Place } from "../lib/model";
 type Result = { lat: number; lng: number; label: string };
-let lastRequest = 0;
+import { findLocations } from "../lib/geocode";
 export function coordinatesFromText(text: string): Result | undefined {
   const decoded = decodeURIComponent(text);
   const pair =
@@ -18,7 +18,9 @@ export function coordinatesFromText(text: string): Result | undefined {
 export default function LocationResolver({
   place,
   onConfirm,
+  savedImmediately = false,
 }: {
+  savedImmediately?: boolean;
   place: Place;
   onConfirm: (lat: number, lng: number) => void;
 }) {
@@ -39,59 +41,9 @@ export default function LocationResolver({
     setBusy(true);
     setMessage("");
     try {
-      const key = "wayfarer-geocode:" + query.trim().toLowerCase();
-      const cached = localStorage.getItem(key);
-      if (cached) {
-        setResults(JSON.parse(cached));
-        return;
-      }
-      if (Date.now() - lastRequest < 1500)
-        throw new Error("Wait a moment before another lookup.");
-      const today = new Date().toISOString().slice(0, 10),
-        quota = JSON.parse(
-          localStorage.getItem("wayfarer-geocode-quota") || "{}",
-        );
-      if (quota.day === today && quota.count >= 30)
-        throw new Error(
-          "Daily limit reached. Paste verified Google Maps coordinates instead.",
-        );
-      lastRequest = Date.now();
-      localStorage.setItem(
-        "wayfarer-geocode-quota",
-        JSON.stringify({
-          day: today,
-          count: quota.day === today ? quota.count + 1 : 1,
-        }),
-      );
-      const response = await fetch(
-        `https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&limit=5`,
-        { signal: AbortSignal.timeout(15000) },
-      );
-      if (!response.ok) throw new Error("Address search unavailable");
-      const data = await response.json();
-      const rows: Result[] = (data.features || [])
-        .map(
-          (f: {
-            geometry: { coordinates: number[] };
-            properties: Record<string, string>;
-          }) => ({
-            lat: f.geometry.coordinates[1],
-            lng: f.geometry.coordinates[0],
-            label: Object.values(f.properties)
-              .filter((v) => typeof v === "string")
-              .join(", "),
-          }),
-        )
-        .filter(
-          (r: Result) =>
-            Number.isFinite(r.lat) &&
-            Number.isFinite(r.lng) &&
-            Math.abs(r.lat) <= 90 &&
-            Math.abs(r.lng) <= 180,
-        );
+      const rows = await findLocations(query);
       setResults(rows);
-      if (rows.length) localStorage.setItem(key, JSON.stringify(rows));
-      else
+      if (!rows.length)
         setMessage(
           "No match. Try the property name, or paste coordinates from Google Maps.",
         );
@@ -180,7 +132,9 @@ export default function LocationResolver({
                 onClick={() => {
                   onConfirm(r.lat, r.lng);
                   setMessage(
-                    "Location confirmed. Save place to display the pin.",
+                    savedImmediately
+                      ? "Location saved on the map."
+                      : "Location confirmed. Save place to display the pin.",
                   );
                   setResults([]);
                 }}
