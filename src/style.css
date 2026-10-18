@@ -2124,3 +2124,13 @@ footer button {
   display: block;
   margin-top: 8px;
 }
+
+.map-list .locate-places {
+  max-height: 480px;
+  overflow-y: auto;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+.location-candidate {
+  flex-direction: row;
+}

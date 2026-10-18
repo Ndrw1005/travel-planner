@@ -107,6 +107,15 @@ export default function MapWorkspace({
       : { ...p, ...resolved[p.id] },
   );
   const active = selected ?? hover;
+  useEffect(() => {
+    if (!loaded || !root.current) return;
+    const observer = new ResizeObserver(() => {
+      if (map.current instanceof L.Map)
+        map.current.invalidateSize({ pan: false });
+    });
+    observer.observe(root.current);
+    return () => observer.disconnect();
+  }, [loaded]);
   const [focusVersion, setFocusVersion] = useState(0);
   function selectPlace(id: string) {
     setDay("");
