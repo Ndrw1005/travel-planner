@@ -1,3 +1,4 @@
+import type { ResearchRecord } from "./import/types";
 export type Currency = "JPY" | "TWD" | "USD";
 export type Kind =
   "airport" | "hotel" | "attraction" | "restaurant" | "station";
@@ -16,6 +17,7 @@ export interface Place {
   minutes: number;
   cost: number;
   rating?: number;
+  propertyId?: string;
   room?: string;
   amenities?: string;
   cancellation?: string;
@@ -34,6 +36,7 @@ export interface Observation {
   basis: string;
   notes: string;
   url?: string;
+  research?: ResearchRecord;
 }
 export interface Stop {
   id: string;
@@ -66,6 +69,7 @@ export interface Watch {
   newLow?: boolean;
 }
 export interface Trip {
+  researchReceipts?: string[];
   id: string;
   name: string;
   origin: string;

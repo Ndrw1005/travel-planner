@@ -70,6 +70,7 @@ export default function MapWorkspace({
     [error, setError] = useState(""),
     [panelOpen, setPanelOpen] = useState(true),
     [query, setQuery] = useState(""),
+    [linkHotel, setLinkHotel] = useState(""),
     [selected, setSelected] = useState<string>(),
     [hover, setHover] = useState<string>(),
     [filters, setFilters] = useState<Kind[]>([
@@ -581,12 +582,36 @@ export default function MapWorkspace({
           <button type="submit">Go</button>
         </form>
         {error && <p className="notice">{error}</p>}
+        {searchResults.length > 0 && (
+          <label style={{ padding: "0 18px" }}>
+            Link a result to a saved hotel
+            <select
+              value={linkHotel}
+              onChange={(e) => setLinkHotel(e.target.value)}
+            >
+              <option value="">Save as a new place</option>
+              {trip.places
+                .filter((p) => p.kind === "hotel")
+                .map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+            </select>
+          </label>
+        )}
         {searchResults.map((p) => (
           <div className="place-card" key={p.id}>
             <b>{p.displayName}</b>
             <p>{p.formattedAddress}</p>
             <button
               onClick={() => {
+                const existing = trip.places.find((h) => h.id === linkHotel);
+                if (existing) {
+                  editPlace({ ...existing, placeId: p.id, demo: false });
+                  setSearchResults([]);
+                  return;
+                }
                 editPlace({
                   id: crypto.randomUUID(),
                   name: p.displayName || "Place",
@@ -603,7 +628,7 @@ export default function MapWorkspace({
                 setSearchResults([]);
               }}
             >
-              Save place reference
+              {linkHotel ? "Review property link" : "Save place reference"}
             </button>
           </div>
         ))}

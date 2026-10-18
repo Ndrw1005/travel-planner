@@ -21,6 +21,7 @@ import {
   Archive,
   Trash2,
   Menu,
+  FileInput,
 } from "lucide-react";
 import { useTrips } from "./lib/store";
 import { newTrip } from "./lib/seed";
@@ -32,11 +33,13 @@ import { Itinerary, Hotels, Attractions } from "./components/Planning";
 import Prices from "./components/Prices";
 import { Budget, Packing, Weather, Bookings } from "./components/Utilities";
 import Integrations from "./components/Integrations";
+import ResearchImport from "./components/ResearchImport";
 const tabs = [
   ["Overview", LayoutDashboard],
   ["Interactive map", Map],
   ["Flights", Plane],
   ["Hotels", Hotel],
+  ["Import research", FileInput],
   ["Attractions", Heart],
   ["Daily itinerary", CalendarDays],
   ["Budget", Wallet],
@@ -50,6 +53,7 @@ export default function App() {
       location.hash.startsWith("#trip/") ? location.hash.split("/")[1] : "",
     ),
     [tab, setTab] = useState("Overview"),
+    [importKind, setImportKind] = useState<"auto" | "flight" | "hotel">("auto"),
     [tripEdit, setTripEdit] = useState<Trip>(),
     [placeEdit, setPlaceEdit] = useState<Place | null>(),
     [archived, setArchived] = useState(false),
@@ -536,7 +540,15 @@ export default function App() {
                 />
               )}{" "}
               {tab === "Flights" && (
-                <Prices trip={trip} update={update} kind="flight" />
+                <Prices
+                  trip={trip}
+                  update={update}
+                  kind="flight"
+                  onImport={() => {
+                    setImportKind("flight");
+                    setTab("Import research");
+                  }}
+                />
               )}
               {tab === "Hotels" && (
                 <>
@@ -562,7 +574,15 @@ export default function App() {
                     }
                   />
                   <div className="divider" />
-                  <Prices trip={trip} update={update} kind="hotel" />
+                  <Prices
+                    trip={trip}
+                    update={update}
+                    kind="hotel"
+                    onImport={() => {
+                      setImportKind("hotel");
+                      setTab("Import research");
+                    }}
+                  />
                 </>
               )}
               {tab === "Attractions" && (
@@ -581,6 +601,15 @@ export default function App() {
               {tab === "Bookings & notes" && (
                 <Bookings trip={trip} update={update} />
               )}{" "}
+              {tab === "Import research" && (
+                <ResearchImport
+                  key={trip.id}
+                  trip={trip}
+                  update={update}
+                  initialKind={importKind}
+                  openMap={() => setTab("Interactive map")}
+                />
+              )}
               {tab === "Integrations" && (
                 <Integrations trip={trip} user={user} reload={reload} />
               )}

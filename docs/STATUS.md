@@ -1,3 +1,11 @@
+# Smart Import enhancement — October 18, 2026
+
+Added browser-only PDF/screenshot/text import, editable review and explicit reconciliation actions, additive source metadata, history-safe comparison grouping, duplicate fingerprints, research JSON backup/merge, and optional saved-hotel linking through map search. Existing storage keys and trip formats remain intact.
+
+Verified: 28 unit/database tests; 17 desktop/mobile browser workflows passed, with three redundant heavy-format mobile cases intentionally skipped. Real PDF.js and Tesseract pipelines exercised with synthetic text PDFs, an eight-page PDF, PNG/JPEG screenshots and image-only PDF. The actual user Google Flights/APA PDFs were unavailable; no claim is made that their specific layouts have passed extraction tests. See [Smart Import](SMART_IMPORT.md).
+
+---
+
 # Initial release status
 
 ## Verified during implementation

@@ -10,15 +10,21 @@
     "test:e2e": "playwright test",
     "preview": "vite preview --host 127.0.0.1",
     "check:backend": "deno check supabase/functions/travel-api/index.ts supabase/functions/monitor/index.ts",
-    "format": "prettier --write src tests"
+    "format": "prettier --write src tests",
+    "predev": "node scripts/copy-import-assets.mjs",
+    "prebuild": "node scripts/copy-import-assets.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.58.0",
+    "@tesseract.js-data/eng": "^1.0.0",
+    "@tesseract.js-data/jpn": "^1.0.0",
     "leaflet": "^1.9.4",
     "lucide-react": "^0.468.0",
+    "pdfjs-dist": "^6.4.299",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
-    "recharts": "^3.2.1"
+    "recharts": "^3.2.1",
+    "tesseract.js": "^7.0.0"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.10",

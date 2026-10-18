@@ -2,6 +2,10 @@
 
 A working React + TypeScript travel workspace for Osaka Christmas 2026 and future trips. Built for `https://ndrw1005.github.io/travel-planner/`, with optional Supabase and Google Maps services. This is an initial usable release, not a claim that every advanced feature in the project brief is complete.
 
+## Update prices without APIs
+
+Use **Import Research** in Flights or Hotels to upload PDFs/screenshots or paste search text. Review and edit offers, then explicitly add observations or candidates. Processing uses browser-side PDF.js and locally served Tesseract OCR; no paid API, account or redeployment is required for future imports. Existing plans/history are preserved. See the [Smart Import guide](docs/SMART_IMPORT.md), including tested fixtures and the pending validation against your two original PDFs.
+
 ## Run locally
 
 ```sh

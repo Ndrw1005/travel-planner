@@ -330,6 +330,47 @@ export function Hotels({
                 {p.cost ? money(p.cost, "JPY") : "No price recorded"}
                 <small> total stay estimate</small>
               </div>
+              {trip.observations
+                .filter(
+                  (o) => o.kind === "hotel" && o.itemId === p.id && o.research,
+                )
+                .sort((a, b) => b.at.localeCompare(a.at))
+                .slice(0, 1)
+                .map((o) => (
+                  <div className="hotel-research-price" key={o.id}>
+                    <small>LATEST IMPORTED OBSERVATION</small>
+                    <p>
+                      {money(o.amount, o.currency)} ·{" "}
+                      {o.research!.details.priceScope} · {o.at.slice(0, 10)}
+                    </p>
+                    <small>
+                      {o.research!.comparable
+                        ? "Confirmed comparison basis"
+                        : "Conditions uncertain"}{" "}
+                      · {o.research!.details.room || "Room not confirmed"}
+                    </small>
+                    {o.currency === "JPY" &&
+                      o.research!.details.priceScope === "stay total" &&
+                      o.research!.details.start === trip.start &&
+                      o.research!.details.end === trip.end &&
+                      Number(o.research!.details.passengers) ===
+                        trip.travelers.length &&
+                      o.research!.comparable && (
+                        <button
+                          onClick={() =>
+                            update({
+                              ...trip,
+                              places: trip.places.map((x) =>
+                                x.id === p.id ? { ...x, cost: o.amount } : x,
+                              ),
+                            })
+                          }
+                        >
+                          Use as stay estimate
+                        </button>
+                      )}
+                  </div>
+                ))}
               <dl>
                 <dt>Room</dt>
                 <dd>{p.room || "Unknown"}</dd>

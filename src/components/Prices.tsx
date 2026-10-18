@@ -8,7 +8,7 @@ import {
   ResponsiveContainer,
   CartesianGrid,
 } from "recharts";
-import { Plus, TrendingDown, Plane, Bell } from "lucide-react";
+import { Plus, TrendingDown, Plane, Bell, UploadCloud } from "lucide-react";
 import {
   type Trip,
   type Observation,
@@ -24,10 +24,12 @@ export default function Prices({
   trip,
   update,
   kind,
+  onImport,
 }: {
   trip: Trip;
   update: (t: Trip) => void;
   kind: "flight" | "hotel";
+  onImport: () => void;
 }) {
   const [editing, setEditing] = useState<Observation | null>(),
     [group, setGroup] = useState(""),
@@ -125,12 +127,16 @@ export default function Prices({
               : "A good stay, at the right price."}
           </h2>
         </div>
-        <div className="row">
+        <div className="row wrap">
+          <button className="primary" onClick={onImport}>
+            <UploadCloud size={16} />
+            Import Research
+          </button>
           <button onClick={() => setWatching(true)}>
             <Bell size={16} />
             New price watch
           </button>
-          <button className="primary" onClick={() => setEditing(null)}>
+          <button onClick={() => setEditing(null)}>
             <Plus size={16} />
             Record price
           </button>
@@ -138,7 +144,8 @@ export default function Prices({
       </div>
       <div className="notice">
         <b>Recorded observations, not current offers.</b> Initial prices are
-        manual research from October 18, 2026. Live checks need a configured
+        manual research from October 18, 2026. Import new PDFs, screenshots or
+        copied text without credentials. Optional live checks need a configured
         backend. Unknown baggage, taxes or room terms are never silently treated
         as equivalent.
       </div>
@@ -229,7 +236,11 @@ export default function Prices({
             <div className="grow">
               <h3>{o.name}</h3>
               <p>{o.notes}</p>
-              <small>{o.basis}</small>
+              <small>
+                {o.research
+                  ? `${o.research.comparable ? "Confirmed" : "Uncertain"} comparison · ${o.research.details.start} – ${o.research.details.end} · ${o.research.details.room || o.research.details.cabin || "Conditions unknown"} · ${o.research.details.priceScope}`
+                  : o.basis}
+              </small>
               <p className="muted">
                 {o.source} · {o.at.slice(0, 10)}
               </p>
