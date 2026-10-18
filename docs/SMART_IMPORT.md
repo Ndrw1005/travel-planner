@@ -59,3 +59,7 @@ No return flight, baggage allowance, exact hotel identity, four-night total, ava
 - `scripts/copy-import-assets.mjs`: prepares locally served OCR assets before development/build.
 
 Provider references: [PDF.js examples](https://mozilla.github.io/pdf.js/examples/) and [Tesseract.js API](https://github.com/naptha/tesseract.js/blob/master/docs/api.md).
+
+### Approve a whole batch
+
+Choose **Approve all entries** to confirm the displayed context, mark every entry reviewed, and select it in one click. Duplicate entries and entries set to Skip are excluded. Missing required fields still need correction. Choose **Confirm import** to save the approved batch.

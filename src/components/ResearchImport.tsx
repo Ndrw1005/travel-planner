@@ -504,6 +504,32 @@ export default function ResearchImport({
             </div>
             <div className="row wrap">
               <button
+                className="primary"
+                disabled={busy}
+                onClick={() =>
+                  setDrafts((ds) =>
+                    ds.map((d) => {
+                      const duplicate =
+                        trip.researchReceipts?.includes(d.fingerprint) ||
+                        trip.observations.some(
+                          (o) => o.research?.fingerprint === d.fingerprint,
+                        );
+                      return duplicate || d.action === "skip"
+                        ? { ...d, selected: false }
+                        : {
+                            ...d,
+                            selected: true,
+                            reviewed: true,
+                            contextConfirmed: true,
+                          };
+                    }),
+                  )
+                }
+              >
+                <Check size={16} />
+                Approve all entries
+              </button>
+              <button
                 onClick={() =>
                   setDrafts((ds) =>
                     ds.map((d) => ({
@@ -524,6 +550,11 @@ export default function ResearchImport({
               </button>
             </div>
           </div>
+          <p className="muted">
+            Approve all confirms the displayed dates, guests and price basis,
+            marks entries reviewed, and selects them. Duplicates and skipped
+            entries stay excluded. Choose Confirm import to save the batch.
+          </p>
           {drafts.map((d, index) => {
             const candidates = matches(d, trip);
             const existing =

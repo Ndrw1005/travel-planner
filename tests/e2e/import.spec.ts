@@ -231,13 +231,11 @@ test("research JSON export can be reviewed and merged without duplicating histor
     .click();
   const download = await downloadPromise;
   const path = await download.path();
-  await page
-    .getByLabel("Research files")
-    .setInputFiles({
-      name: "wayfarer-research.json",
-      mimeType: "application/json",
-      buffer: await readFile(path!),
-    });
+  await page.getByLabel("Research files").setInputFiles({
+    name: "wayfarer-research.json",
+    mimeType: "application/json",
+    buffer: await readFile(path!),
+  });
   await expect(
     page.getByRole("heading", { name: "Review research backup merge" }),
   ).toBeVisible();
@@ -252,4 +250,61 @@ test("research JSON export can be reviewed and merged without duplicating histor
   );
   expect(trip.places).toHaveLength(7);
   expect(trip.observations).toHaveLength(4);
+});
+
+test("approve all selects and reviews the batch while excluding skips and duplicates", async ({
+  page,
+}) => {
+  await openImport(page);
+  const batch =
+    pasted +
+    "\n\n" +
+    pasted.replace("Example Air", "Second Air") +
+    "\n\n" +
+    pasted.replace("Example Air", "Skipped Air");
+  await page.getByLabel("Or paste copied website text").fill(batch);
+  await page.getByRole("button", { name: "Extract pasted text" }).click();
+  const entries = page.locator(".import-entry");
+  await expect(entries).toHaveCount(3);
+  await entries.nth(2).getByLabel("What should happen?").selectOption("skip");
+  await page
+    .getByRole("button", { name: "Approve all entries", exact: true })
+    .click();
+  for (let i = 0; i < 2; i++) {
+    await expect(
+      entries.nth(i).getByRole("checkbox", { name: `Select entry ${i + 1}` }),
+    ).toBeChecked();
+    await expect(
+      entries
+        .nth(i)
+        .getByRole("checkbox", { name: "I checked this entry", exact: false }),
+    ).toBeChecked();
+    await expect(
+      entries
+        .nth(i)
+        .getByRole("checkbox", {
+          name: "I confirm these travel/stay",
+          exact: false,
+        }),
+    ).toBeChecked();
+  }
+  await expect(
+    entries.nth(2).getByRole("checkbox", { name: "Select entry 3" }),
+  ).not.toBeChecked();
+  await page
+    .getByRole("button", { name: "Confirm import", exact: true })
+    .click();
+  await expect(
+    page.getByText("2 price observations added;", { exact: false }),
+  ).toBeVisible();
+  await page.getByLabel("Or paste copied website text").fill(batch);
+  await page.getByRole("button", { name: "Extract pasted text" }).click();
+  await page
+    .getByRole("button", { name: "Approve all entries", exact: true })
+    .click();
+  for (let i = 0; i < 2; i++) {
+    await expect(
+      entries.nth(i).getByRole("checkbox", { name: `Select entry ${i + 1}` }),
+    ).not.toBeChecked();
+  }
 });
