@@ -1,3 +1,6 @@
+import PlaceSuggestions from "./PlaceSuggestions";
+import { selectedLocation } from "../lib/placeSearch";
+import { canonical } from "../lib/import/coordinates";
 import LocatePlaces from "./LocatePlaces";
 import LocalPhoto from "./LocalPhoto";
 import { useEffect, useRef, useState } from "react";
@@ -14,6 +17,7 @@ import {
 } from "lucide-react";
 import { api, googleKey, loadGoogle } from "../lib/api";
 import {
+  uid,
   type Trip,
   type Place,
   type Kind,
@@ -68,6 +72,7 @@ export default function MapWorkspace({
     map = useRef<L.Map | google.maps.Map | null>(null),
     markers = useRef<(L.Marker | google.maps.Marker)[]>([]),
     lines = useRef<(L.Polyline | google.maps.Polyline)[]>([]);
+  const [searchVersion, setSearchVersion] = useState(0);
   const [loaded, setLoaded] = useState(false),
     [error, setError] = useState(""),
     [panelOpen, setPanelOpen] = useState(true),
@@ -633,7 +638,8 @@ export default function MapWorkspace({
           className="search"
           onSubmit={(e) => {
             e.preventDefault();
-            void search();
+            if (googleKey) void search();
+            else setSearchVersion((v) => v + 1);
           }}
         >
           <Search size={17} />
@@ -645,6 +651,46 @@ export default function MapWorkspace({
           />
           <button type="submit">Go</button>
         </form>
+        <PlaceSuggestions
+          submitVersion={searchVersion}
+          query={query}
+          trip={trip}
+          choose={(r) => {
+            const matches = trip.places.filter(
+              (p) =>
+                canonical(p.name) === canonical(query) ||
+                canonical(p.name) === canonical(r.name) ||
+                (!!p.address && canonical(p.address) === canonical(query)),
+            );
+            if (matches.length === 1) {
+              update({
+                ...trip,
+                places: trip.places.map((p) =>
+                  p.id === matches[0].id ? { ...p, ...selectedLocation(r) } : p,
+                ),
+              });
+              setQuery("");
+              selectPlace(matches[0].id);
+            } else
+              editPlace({
+                id: uid(),
+                name: r.name || query,
+                address: r.formatted,
+                kind: /hotel|ホテル/i.test(r.name)
+                  ? "hotel"
+                  : /station|駅/.test(r.name)
+                    ? "station"
+                    : "attraction",
+                notes: "",
+                source: "Geoapify place search",
+                priority: "Interested",
+                minutes: 60,
+                cost: 0,
+                votes: [],
+                ...selectedLocation(r),
+              });
+          }}
+        />
         {error && <p className="notice">{error}</p>}
         {searchResults.length > 0 && (
           <label style={{ padding: "0 18px" }}>
@@ -862,6 +908,21 @@ export default function MapWorkspace({
           <span className="map-label">
             <Layers size={14} />
             {googleKey ? "Google Maps" : "OpenStreetMap · saved places"}
+            {trip.places.some((p) =>
+              p.locationEvidence?.provider.includes("Geoapify"),
+            ) && (
+              <>
+                {" "}
+                ·{" "}
+                <a
+                  href="https://www.geoapify.com/"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  Geocoding: Geoapify
+                </a>
+              </>
+            )}
           </span>
           <button
             onClick={() => {

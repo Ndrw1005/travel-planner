@@ -204,6 +204,13 @@ export function assessCoordinates(
       "Result conflicts with the existing pin by more than 5 km; existing location preserved.",
     );
   if (provider) {
+    const expectedPostcode = p.address.match(/\b\d{3}-\d{4}\b/)?.[0];
+    if (
+      expectedPostcode &&
+      r.postcode &&
+      canonical(expectedPostcode) !== canonical(r.postcode)
+    )
+      return review("Returned postcode differs from the saved full address.");
     const area = pick(r, "city", "county", "state");
     const expected = canonical(
       [p.address, p.mapQuery, trip?.destination].filter(Boolean).join(" "),

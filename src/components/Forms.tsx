@@ -1,3 +1,5 @@
+import PlaceSuggestions from "./PlaceSuggestions";
+import { selectedLocation } from "../lib/placeSearch";
 import LocationResolver from "./LocationResolver";
 import { useState, type ReactNode } from "react";
 import { X } from "lucide-react";
@@ -182,11 +184,13 @@ export function TripForm({
   );
 }
 export function PlaceForm({
+  trip,
   place,
   save,
   remove,
   close,
 }: {
+  trip?: Trip;
   place?: Place;
   save: (p: Place) => void;
   remove?: (id: string) => void;
@@ -223,6 +227,20 @@ export function PlaceForm({
             onChange={(e) => set({ ...p, name: e.target.value })}
           />
         </label>
+        {trip && (
+          <PlaceSuggestions
+            query={p.name}
+            trip={trip}
+            choose={(r) =>
+              set({
+                ...p,
+                ...selectedLocation(r),
+                name: r.name || p.name,
+                address: r.formatted,
+              })
+            }
+          />
+        )}
         <div className="form-grid">
           <label>
             Category
@@ -296,6 +314,15 @@ export function PlaceForm({
             onChange={(e) => set({ ...p, address: e.target.value })}
           />
         </label>
+        {trip && (
+          <PlaceSuggestions
+            query={p.address}
+            trip={trip}
+            choose={(r) =>
+              set({ ...p, ...selectedLocation(r), address: r.formatted })
+            }
+          />
+        )}
         <LocationResolver
           key={p.id}
           place={p}

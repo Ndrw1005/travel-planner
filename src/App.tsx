@@ -1,3 +1,5 @@
+import AutoGeocode from "./components/AutoGeocode";
+import { locationSignature, unresolved } from "./lib/placeSearch";
 import { useState, useEffect } from "react";
 import {
   Compass,
@@ -440,6 +442,29 @@ export default function App() {
               </div>
             </div>
             <div className="page workspace">
+              <AutoGeocode
+                key={trip.id}
+                trip={trip}
+                signedIn={!!user}
+                patch={(id, signature, value) =>
+                  setTrips((prev) =>
+                    prev.map((t) =>
+                      t.id !== trip.id
+                        ? t
+                        : {
+                            ...t,
+                            places: t.places.map((p) =>
+                              p.id === id &&
+                              unresolved(p) &&
+                              locationSignature(p) === signature
+                                ? { ...p, ...value }
+                                : p,
+                            ),
+                          },
+                    ),
+                  )
+                }
+              />
               {tab === "Overview" && (
                 <>
                   <div className="overview-banner">
@@ -638,6 +663,7 @@ export default function App() {
       )}{" "}
       {placeEdit !== undefined && trip && (
         <PlaceForm
+          trip={trip}
           place={placeEdit ?? undefined}
           close={() => setPlaceEdit(undefined)}
           save={(p) =>

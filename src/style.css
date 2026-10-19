@@ -2134,3 +2134,17 @@ footer button {
 .location-candidate {
   flex-direction: row;
 }
+
+.place-suggestions {
+  padding: 0 12px;
+  max-height: 320px;
+  overflow: auto;
+}
+.place-suggestions button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  white-space: normal;
+  margin: 6px 0;
+  overflow-wrap: anywhere;
+}

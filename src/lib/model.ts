@@ -23,6 +23,7 @@ export interface Place {
   researchKeys?: string[];
   researchData?: Record<string, string>;
   coordinateStatus?: string;
+  geocodeAttempt?: string;
   locationEvidence?: import("./import/coordinates").LocationEvidence;
   locationReview?: {
     reason: string;

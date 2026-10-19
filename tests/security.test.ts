@@ -24,6 +24,7 @@ beforeAll(async () => {
       "",
     ),
   );
+  await db.exec(readFileSync("supabase/migrations/002_geocoding.sql", "utf8"));
   await db.query("insert into auth.users values ($1),($2),($3)", [
     owner,
     partner,
@@ -120,4 +121,11 @@ describe("private trip authorization and concurrent updates", () => {
       ).rows[0].consume_request,
     ).toBe(false);
   });
+});
+
+it("denies direct browser access to geocoding cache", async () => {
+  await asUser(owner, "owner@example.com");
+  await expect(
+    db.query("select * from public.geocode_cache"),
+  ).rejects.toThrow();
 });

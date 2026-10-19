@@ -1,3 +1,4 @@
+import { geocode } from "../_shared/geocoding.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { admin, checkPrice } from "../_shared/service.ts";
 const headers = {
@@ -38,11 +39,21 @@ Deno.serve(async (req) => {
     if (body.action === "status")
       return Response.json(
         {
+          geocoding: !!Deno.env.get("GEOAPIFY_API_KEY"),
           routes: !!Deno.env.get("GOOGLE_ROUTES_KEY"),
           pricing: !!Deno.env.get("SERPAPI_KEY"),
         },
         { headers },
       );
+    if (body.action === "geocode" || body.action === "autocomplete") {
+      const origin = req.headers.get("Origin");
+      if (origin && origin !== headers["Access-Control-Allow-Origin"])
+        return Response.json(
+          { error: "Origin not allowed" },
+          { status: 403, headers },
+        );
+      return Response.json(await geocode(db, user.id, body), { headers });
+    }
     const scoped = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_ANON_KEY")!,

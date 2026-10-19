@@ -85,6 +85,11 @@ export default function Integrations({
             "Authentication, private shared trips, observations and alerts.",
           ],
           [
+            "Geoapify location search",
+            status?.geocoding,
+            "Free-tier key stored on the backend. Automatic geocoding, English/Japanese suggestions and bounded request budgets.",
+          ],
+          [
             "Google Routes",
             status?.routes,
             "Protected server key and enabled Routes API required.",
