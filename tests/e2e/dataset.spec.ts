@@ -335,7 +335,7 @@ test("coordinate CSV automatically updates existing records, map pins, backups a
 }) => {
   const requests: string[] = [];
   page.on("request", (request) => {
-    if (/geoapify|photon|nominatim/.test(request.url()))
+    if (/geoapify|photon|nominatim/.test(new URL(request.url()).hostname))
       requests.push(request.url());
   });
   await page.goto("./");

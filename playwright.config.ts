@@ -40,8 +40,9 @@ export default defineConfig({
       url: "http://127.0.0.1:5174/travel-planner/",
       reuseExistingServer: false,
       env: {
-        VITE_SUPABASE_URL: "https://wayfarer-test.supabase.co",
-        VITE_SUPABASE_ANON_KEY: "test-public-key",
+        VITE_GEOAPIFY_KEY: "test-browser-restricted-key",
+        VITE_SUPABASE_URL: "",
+        VITE_SUPABASE_ANON_KEY: "",
       },
     },
   ],

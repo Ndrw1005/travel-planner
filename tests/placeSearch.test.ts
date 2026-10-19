@@ -1,7 +1,7 @@
 import { it, expect, vi, beforeEach } from "vitest";
 import { seedTrip } from "../src/lib/seed";
 import type { SearchResult } from "../src/lib/placeSearch";
-vi.mock("../src/lib/api", () => ({ api: vi.fn() }));
+vi.mock("../src/lib/geoapify", () => ({ geoapifyRequest: vi.fn() }));
 import {
   evaluateResults,
   searchCenter,
@@ -9,7 +9,7 @@ import {
   searchPlaces,
   resolvePlace,
 } from "../src/lib/placeSearch";
-import { api } from "../src/lib/api";
+import { geoapifyRequest } from "../src/lib/geoapify";
 const result: SearchResult = {
   lat: 34.68,
   lon: 135.5,
@@ -42,7 +42,7 @@ const trip = () => {
   ];
   return t;
 };
-beforeEach(() => vi.mocked(api).mockReset());
+beforeEach(() => vi.mocked(geoapifyRequest).mockReset());
 it("accepts a reliable hotel and retains metadata independently of price/research", () => {
   const t = trip();
   const patch = evaluateResults([result], t.places[0], t);
@@ -78,18 +78,18 @@ it("invalidates attempted queries when addresses change", () => {
   );
 });
 it("deduplicates requests and reuses cached results", async () => {
-  vi.mocked(api).mockResolvedValue({ results: [result] });
+  vi.mocked(geoapifyRequest).mockResolvedValue({ results: [result] });
   const t = trip();
   await Promise.all([
     searchPlaces("dedup test", t),
     searchPlaces("dedup test", t),
   ]);
   await searchPlaces("dedup test", t);
-  expect(api).toHaveBeenCalledTimes(1);
+  expect(geoapifyRequest).toHaveBeenCalledTimes(1);
 });
 it("tries another query when the first result is not a property", async () => {
   vi.useFakeTimers();
-  vi.mocked(api)
+  vi.mocked(geoapifyRequest)
     .mockResolvedValueOnce({
       results: [{ ...result, name: "Osaka", result_type: "city" }],
     })
@@ -98,6 +98,6 @@ it("tries another query when the first result is not a property", async () => {
   const work = resolvePlace(t.places[0], t);
   await vi.runAllTimersAsync();
   expect(await work).toMatchObject({ lat: 34.68, lng: 135.5 });
-  expect(api).toHaveBeenCalledTimes(2);
+  expect(geoapifyRequest).toHaveBeenCalledTimes(2);
   vi.useRealTimers();
 });

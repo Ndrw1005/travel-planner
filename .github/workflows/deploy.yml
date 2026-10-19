@@ -25,6 +25,7 @@ jobs:
         env:
           VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
+          VITE_GEOAPIFY_KEY: ${{ vars.VITE_GEOAPIFY_KEY }}
           VITE_GOOGLE_MAPS_KEY: ${{ vars.VITE_GOOGLE_MAPS_KEY }}
       - run: npx playwright install --with-deps chromium
       - run: npm run test:e2e

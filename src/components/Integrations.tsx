@@ -1,3 +1,4 @@
+import { geoapifyConfigured } from "../lib/geoapify";
 import { useState } from "react";
 import { supabase, googleKey, api } from "../lib/api";
 import type { Trip } from "../lib/model";
@@ -86,8 +87,8 @@ export default function Integrations({
           ],
           [
             "Geoapify location search",
-            status?.geocoding,
-            "Free-tier key stored on the backend. Automatic geocoding, English/Japanese suggestions and bounded request budgets.",
+            geoapifyConfigured(),
+            "Browser-restricted Geoapify key. Automatic geocoding and English/Japanese suggestions; no Supabase required. Configure provider origin/referrer restrictions.",
           ],
           [
             "Google Routes",

@@ -1,4 +1,4 @@
-import { api } from "./api";
+import { geoapifyRequest } from "./geoapify";
 import type { Place, Trip } from "./model";
 import {
   assessCoordinates,
@@ -67,7 +67,7 @@ export function searchPlaces(
       );
       signal?.throwIfAborted();
       last = Date.now();
-      const data = await api(action, { text, center });
+      const data = await geoapifyRequest(action, { text, center });
       const rows: SearchResult[] = data.results || [];
       if (cache.size >= 500) cache.delete(cache.keys().next().value!);
       cache.set(key, rows);

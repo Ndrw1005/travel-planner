@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { api, supabase } from "../lib/api";
+import { geoapifyConfigured } from "../lib/geoapify";
 import type { Trip } from "../lib/model";
 import { searchPlaces, type SearchResult } from "../lib/placeSearch";
 export default function PlaceSuggestions({
@@ -15,20 +15,8 @@ export default function PlaceSuggestions({
 }) {
   const [results, setResults] = useState<SearchResult[]>([]),
     [error, setError] = useState(""),
-    [enabled, setEnabled] = useState(false),
     [busy, setBusy] = useState(false);
-  useEffect(() => {
-    let active = true;
-    if (supabase)
-      void api("status", {})
-        .then((s) => {
-          if (active) setEnabled(!!s.geocoding);
-        })
-        .catch(() => {});
-    return () => {
-      active = false;
-    };
-  }, []);
+  const enabled = geoapifyConfigured();
   useEffect(() => {
     setResults([]);
     setError("");

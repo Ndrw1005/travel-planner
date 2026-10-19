@@ -445,7 +445,6 @@ export default function App() {
               <AutoGeocode
                 key={trip.id}
                 trip={trip}
-                signedIn={!!user}
                 patch={(id, signature, value) =>
                   setTrips((prev) =>
                     prev.map((t) =>

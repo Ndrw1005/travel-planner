@@ -7,85 +7,47 @@ test("automatic imported-property geocoding, review, persistence and Japanese su
   let saved = seedTrip();
   saved.places = saved.places.filter((p) => p.kind === "airport");
   saved.observations = [];
-  let version = 0;
   const queries: string[] = [];
-  const user = {
-    id: "11111111-1111-4111-8111-111111111111",
-    aud: "authenticated",
-    role: "authenticated",
-    email: "test@example.com",
-    app_metadata: {},
-    user_metadata: {},
-    created_at: new Date().toISOString(),
-  };
-  await page.addInitScript(
-    ({ trip, user }) => {
-      if (!localStorage.getItem("wayfarer-v1"))
-        localStorage.setItem("wayfarer-v1", JSON.stringify([trip]));
-      const exp = Math.floor(Date.now() / 1000) + 3600;
-      const token =
-        btoa(JSON.stringify({ alg: "HS256", typ: "JWT" })) +
-        "." +
-        btoa(JSON.stringify({ sub: user.id, exp })) +
-        ".test";
-      localStorage.setItem(
-        "sb-wayfarer-test-auth-token",
-        JSON.stringify({
-          access_token: token,
-          refresh_token: "test-refresh",
-          expires_at: exp,
-          expires_in: 3600,
-          token_type: "bearer",
-          user,
-        }),
-      );
-    },
-    { trip: saved, user },
-  );
-  await page.route("https://wayfarer-test.supabase.co/**", async (route) => {
-    const request = route.request(),
-      url = request.url();
-    if (url.includes("/functions/v1/travel-api")) {
-      const body = request.postDataJSON();
-      if (body.action === "status")
-        return route.fulfill({ json: { geocoding: true, routes: false } });
-      queries.push(body.text);
-      const name = body.text.includes("Osaka Test Hotel")
-        ? "Osaka Test Hotel"
-        : body.text.includes("大阪駅")
-          ? "大阪駅"
-          : "Osaka";
-      return route.fulfill({
-        json: {
-          results: [
-            {
-              lat: 34.69,
-              lon: 135.5,
-              name,
-              formatted: name + ", Osaka, Japan",
-              city: "Osaka",
-              state: "Osaka",
-              country: "Japan",
-              result_type: name === "Osaka" ? "city" : "amenity",
-              rank: { confidence: 0.99 },
-              datasource: { attribution: "© OpenStreetMap contributors" },
-              place_id: "test",
-              housenumber: "",
-              street: "",
-              postcode: "",
-            },
-          ],
-        },
-      });
-    }
-    if (url.includes("/rpc/save_trip")) {
-      saved = request.postDataJSON().p_data;
-      return route.fulfill({ json: ++version });
-    }
-    if (url.includes("/rest/v1/trips"))
-      return route.fulfill({ json: [{ id: saved.id, data: saved, version }] });
-    if (url.includes("/auth/v1/user")) return route.fulfill({ json: user });
-    return route.fulfill({ json: {} });
+  await page.addInitScript((trip) => {
+    if (!localStorage.getItem("wayfarer-v1"))
+      localStorage.setItem("wayfarer-v1", JSON.stringify([trip]));
+  }, saved);
+  const readSaved = async () =>
+    page.evaluate(
+      () => JSON.parse(localStorage.getItem("wayfarer-v1")!)[0],
+    ) as Promise<typeof saved>;
+  await page.route("https://api.geoapify.com/**", async (route) => {
+    const body = {
+      text: new URL(route.request().url()).searchParams.get("text")!,
+    };
+    queries.push(body.text);
+    const name = body.text.includes("Osaka Test Hotel")
+      ? "Osaka Test Hotel"
+      : body.text.includes("大阪駅")
+        ? "大阪駅"
+        : "Osaka";
+    return route.fulfill({
+      json: {
+        results: [
+          {
+            lat: 34.69,
+            lon: 135.5,
+            name,
+            formatted: name + ", Osaka, Japan",
+            city: "Osaka",
+            state: "Osaka",
+            country: "Japan",
+            result_type: name === "Osaka" ? "city" : "amenity",
+            rank: { confidence: 0.99 },
+            datasource: { attribution: "© OpenStreetMap contributors" },
+            place_id: "test",
+            housenumber: "",
+            street: "",
+            postcode: "",
+          },
+        ],
+      },
+    });
   });
   await page.goto("./");
   await page.getByRole("button", { name: "Open trip", exact: true }).click();
@@ -125,8 +87,13 @@ test("automatic imported-property geocoding, review, persistence and Japanese su
     page.getByRole("region", { name: "Automatic location search" }),
   ).toContainText("1 locations need review", { timeout: 30000 });
   await expect
-    .poll(() => saved.places.find((p) => p.name === "Osaka Test Hotel")?.lat)
+    .poll(
+      async () =>
+        (await readSaved()).places.find((p) => p.name === "Osaka Test Hotel")
+          ?.lat,
+    )
     .toBe(34.69);
+  saved = await readSaved();
   expect(saved.observations[0].amount).toBe(46000);
   expect(
     saved.places.find((p) => p.name === "Unknown Test Museum")?.lat,
@@ -140,8 +107,8 @@ test("automatic imported-property geocoding, review, persistence and Japanese su
   ).toHaveCount(1);
   await expect
     .poll(
-      () =>
-        saved.places.find((p) => p.name === "Unknown Test Museum")
+      async () =>
+        (await readSaved()).places.find((p) => p.name === "Unknown Test Museum")
           ?.geocodeAttempt,
     )
     .toBeTruthy();

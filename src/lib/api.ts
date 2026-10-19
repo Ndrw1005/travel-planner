@@ -12,21 +12,7 @@ export async function api(action: string, payload: unknown) {
   const { data, error } = await supabase.functions.invoke("travel-api", {
     body: { action, ...(payload as object) },
   });
-  if (error) {
-    let message = data?.error;
-    if (
-      !message &&
-      ["geocode", "autocomplete"].includes(action) &&
-      error.context instanceof Response
-    ) {
-      try {
-        message = (await error.context.clone().json()).error;
-      } catch {
-        /* Keep the transport message. */
-      }
-    }
-    throw new Error(message || error.message);
-  }
+  if (error) throw new Error(data?.error || error.message);
   if (data.error) throw new Error(data.error);
   return data;
 }
